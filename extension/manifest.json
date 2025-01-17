@@ -6,11 +6,10 @@
   "background": {
     "scripts": ["background.js"]
   },
-  "permissions": ["nativeMessaging"],
+  "permissions": ["downloads", "nativeMessaging"],
   "applications": {
     "gecko": {
       "id": "down-poc@example.com"
     }
   }
 }
-

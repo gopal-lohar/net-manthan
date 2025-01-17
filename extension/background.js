@@ -1,16 +1,22 @@
-// Open a connection to the native host
-const port = browser.runtime.connectNative("com.down_poc.native_messaging");
+const nativeAppName = "com.down_poc.native_messaging";
 
-// Send a test message
-port.postMessage({ message: "Hello from down-poc extension!" });
-
-// Listen for messages from the native host
-port.onMessage.addListener((response) => {
-  console.log("Received from native host:", response);
+browser.downloads.onCreated.addListener((downloadItem) => {
+  sendMessageToNativeApp(downloadItem);
 });
 
-// Handle disconnection
-port.onDisconnect.addListener(() => {
-  console.error("Disconnected from native host");
-});
+function sendMessageToNativeApp(downloadItem) {
+  const message = {
+    action: "startDownload",
+    url: downloadItem.url,
+    filename: downloadItem.filename,
+  };
 
+  console.log(downloadItem);
+
+  const port = browser.runtime.connectNative(nativeAppName);
+  port.postMessage(message);
+
+  port.onMessage.addListener((response) => {
+    console.log("Received from native app:", response);
+  });
+}
