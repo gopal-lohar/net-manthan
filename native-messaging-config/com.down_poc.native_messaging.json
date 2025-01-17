@@ -1,0 +1,7 @@
+{
+  "name": "com.down_poc.native_messaging",
+  "description": "Native messaging host for down-poc extension.",
+  "path": "path/to/binary",
+  "type": "stdio",
+  "allowed_extensions": ["down-poc@example.com"]
+}

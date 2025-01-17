@@ -1,0 +1,16 @@
+{
+  "manifest_version": 2,
+  "name": "down-poc",
+  "version": "1.0",
+  "description": "Proof of concept for a download manager using Native Messaging.",
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "permissions": ["nativeMessaging"],
+  "applications": {
+    "gecko": {
+      "id": "down-poc@example.com"
+    }
+  }
+}
+
