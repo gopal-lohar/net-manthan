@@ -1,39 +1,26 @@
-const NATIVE_APP_NAME = "com.netmanthan.nativemessaging";
+let port = browser.runtime.connectNative("com.net.manthan");
 
-browser.downloads.onCreated.addListener(async (downloadItem) => {
-  try {
-    await browser.downloads.cancel(downloadItem.id);
-    console.log(`Download canceled: ${downloadItem.url}`);
-
-    const message = {
-      url: downloadItem.url,
-      filename: downloadItem.filename,
-      mimeType: downloadItem.mime,
-    };
-
-    sendToNativeApp(message);
-  } catch (error) {
-    console.error("Error handling download:", error);
+port.onDisconnect.addListener((p) => {
+  if (p.error) {
+    console.error(`Disconnected due to error: ${p.error.message}`);
   }
 });
 
-function sendToNativeApp(message) {
-  const port = browser.runtime.connectNative(NATIVE_APP_NAME);
-
+browser.downloads.onCreated.addListener(async (downloadItem) => {
+  await browser.downloads.cancel(downloadItem.id);
+  console.log(downloadItem);
+  console.log(`Download\n\n ${JSON.stringify(downloadItem)} \n\n\n`);
+  const message = {
+    url: downloadItem.url,
+    filename: downloadItem.filename,
+    mime: downloadItem.mime,
+    referrer: downloadItem.referrer,
+    headers: downloadItem.headers,
+  };
+  console.log(message);
   port.postMessage(message);
-  console.log("Message sent to native app:", message);
+});
 
-  port.onMessage.addListener((response) => {
-    console.log("Response from native app:", response);
-  });
-
-  port.onDisconnect.addListener(() => {
-    if (port.error) {
-      console.error(
-        `Native messaging host disconnected: ${port.error.message}`,
-      );
-    } else {
-      console.log("Native messaging host disconnected normally.");
-    }
-  });
-}
+port.onMessage.addListener((response) => {
+  console.log("Received from native app:", response);
+});

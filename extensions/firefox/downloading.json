@@ -1,0 +1,20 @@
+{
+  "id": 3,
+  "url": "https://download.microsoft.com/download/6/8/3/683178b7-baac-4b0d-95be-065a945aadee/Windows11InstallationAssistant.exe",
+  "referrer": "https://www.microsoft.com/en-us/software-download/windows11",
+  "filename": "/home/titan/Downloads/Windows11InstallationAssistant(2).exe",
+  "incognito": false,
+  "cookieStoreId": "firefox-default",
+  "danger": "safe",
+  "mime": "application/octet-stream",
+  "startTime": "2025-01-20T13:51:51.465Z",
+  "endTime": null,
+  "state": "in_progress",
+  "paused": false,
+  "canResume": false,
+  "error": null,
+  "bytesReceived": 0,
+  "totalBytes": -1,
+  "fileSize": -1,
+  "exists": false
+}
