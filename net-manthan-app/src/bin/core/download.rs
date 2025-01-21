@@ -58,11 +58,24 @@ async fn check_download_info(
     })
 }
 
+fn write_to_file(file: Arc<Mutex<File>>, buf: &[u8]) -> Result<(), DownloadError> {
+    match file.lock().unwrap().write_all(&buf) {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            return Err(DownloadError::FileError(format!(
+                "failed while writing chunk to file(buffer), Error: {}",
+                err
+            )));
+        }
+    }
+}
+
 async fn download_part(
     client: &Client,
     file: Arc<Mutex<File>>,
     part: DownloadPart,
 ) -> Result<(), DownloadError> {
+    const BUFFER_SIZE: usize = 1024 * 1024;
     let mut chunk_sizes = Vec::<f64>::new();
     let response = match client.get(&part.url).send().await {
         Ok(response) => {
@@ -85,21 +98,28 @@ async fn download_part(
 
     let mut stream = response.bytes_stream();
 
-    // let mut file = BufWriter::new(file); // I will Create my own buffer
+    // let mut buffer = BufWriter::new(file); // I will Create my own buffer
+    let mut buffer = Vec::<u8>::with_capacity(BUFFER_SIZE);
 
     while let Some(chunk) = stream.next().await {
         match chunk {
             Ok(chunk) => {
                 chunk_sizes.push((chunk.len() as f64) / 1024.0);
-                // match file.write_all(&chunk) {
-                //     Ok(_) => (),
-                //     Err(err) => {
-                //         return Err(DownloadError::DownloadPartError(format!(
-                //             "failed while writing chunk to file(buffer), Error: {}",
-                //             err
-                //         )));
-                //     }
-                // }
+
+                // buffer logic
+                // assuming the chunk is generally less than buffer size
+                if chunk.len() >= BUFFER_SIZE {
+                    let mut combined = buffer.clone();
+                    combined.extend_from_slice(&chunk);
+                    write_to_file(file.clone(), &combined)?;
+                    buffer.clear();
+                } else if buffer.len() + chunk.len() >= BUFFER_SIZE {
+                    write_to_file(file.clone(), &buffer)?;
+                    buffer.clear();
+                    buffer.extend_from_slice(&chunk);
+                } else {
+                    buffer.extend_from_slice(&chunk);
+                }
             }
             Err(err) => {
                 return Err(DownloadError::DownloadPartError(format!(
@@ -109,6 +129,10 @@ async fn download_part(
             }
         }
     }
+
+    // buffer logic
+    write_to_file(file.clone(), &buffer)?;
+    buffer.clear();
 
     let total_size: f64 = chunk_sizes.iter().sum();
     info!(
