@@ -1,4 +1,5 @@
-mod download;
+pub mod download;
+pub mod errors;
 
 use std::{
     io::{Read, Write},
