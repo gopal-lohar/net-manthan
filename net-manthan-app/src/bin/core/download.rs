@@ -4,7 +4,7 @@ use futures_util::StreamExt;
 use reqwest::{header, Client};
 use serde::Deserialize;
 use std::fs::{File, OpenOptions};
-use std::io::Write;
+use std::io::{Seek, SeekFrom, Write};
 use std::sync::{Arc, Mutex};
 use tracing::{error, info};
 
@@ -23,7 +23,6 @@ struct DownloadInfo {
     supports_parts: bool,
 }
 
-#[derive(Clone, Debug)]
 struct DownloadPart {
     url: String,
     range: Option<(u64, u64)>,
@@ -58,8 +57,18 @@ async fn check_download_info(
     })
 }
 
-fn write_to_file(file: Arc<Mutex<File>>, buf: &[u8]) -> Result<(), DownloadError> {
-    match file.lock().unwrap().write_all(&buf) {
+fn write_to_file(
+    file: Arc<Mutex<File>>,
+    buf: &[u8],
+    seek_position: Option<u64>,
+) -> Result<(), DownloadError> {
+    let mut file = file.lock().unwrap();
+    if let Some(offset) = seek_position {
+        file.seek(SeekFrom::Start(offset)).map_err(|e| {
+            DownloadError::FileError(format!("Failed to seek to position {}: {}", offset, e))
+        })?;
+    }
+    match file.write_all(&buf) {
         Ok(_) => Ok(()),
         Err(err) => {
             return Err(DownloadError::FileError(format!(
@@ -77,7 +86,18 @@ async fn download_part(
 ) -> Result<(), DownloadError> {
     const BUFFER_SIZE: usize = 1024 * 1024;
     let mut chunk_sizes = Vec::<f64>::new();
-    let response = match client.get(&part.url).send().await {
+    let response = match {
+        match part.range {
+            Some((start, end)) => {
+                client
+                    .get(&part.url)
+                    .header(header::RANGE, format!("bytes={}-{}", start, end))
+                    .send()
+                    .await
+            }
+            None => client.get(&part.url).send().await,
+        }
+    } {
         Ok(response) => {
             if !response.status().is_success() {
                 return Err(DownloadError::DownloadPartError(format!(
@@ -100,6 +120,10 @@ async fn download_part(
 
     // let mut buffer = BufWriter::new(file); // I will Create my own buffer
     let mut buffer = Vec::<u8>::with_capacity(BUFFER_SIZE);
+    let mut position = match part.range {
+        Some((start, _)) => start,
+        None => 0,
+    };
 
     while let Some(chunk) = stream.next().await {
         match chunk {
@@ -111,10 +135,12 @@ async fn download_part(
                 if chunk.len() >= BUFFER_SIZE {
                     let mut combined = buffer.clone();
                     combined.extend_from_slice(&chunk);
-                    write_to_file(file.clone(), &combined)?;
+                    write_to_file(file.clone(), &combined, Some(position))?;
+                    position += combined.len() as u64;
                     buffer.clear();
                 } else if buffer.len() + chunk.len() >= BUFFER_SIZE {
-                    write_to_file(file.clone(), &buffer)?;
+                    write_to_file(file.clone(), &buffer, Some(position))?;
+                    position += buffer.len() as u64;
                     buffer.clear();
                     buffer.extend_from_slice(&chunk);
                 } else {
@@ -131,7 +157,8 @@ async fn download_part(
     }
 
     // buffer logic
-    write_to_file(file.clone(), &buffer)?;
+    write_to_file(file.clone(), &buffer, Some(position))?;
+    // position += buffer.len() as u64;
     buffer.clear();
 
     let total_size: f64 = chunk_sizes.iter().sum();
@@ -161,7 +188,7 @@ pub async fn handle_download(request: DownloadRequest) -> Result<(), DownloadErr
         .green()
     );
 
-    let mut file = Arc::new(Mutex::new(
+    let file = Arc::new(Mutex::new(
         match OpenOptions::new()
             .create(true)
             .write(true)
@@ -176,31 +203,76 @@ pub async fn handle_download(request: DownloadRequest) -> Result<(), DownloadErr
             }
         },
     ));
+
+    match file.lock().unwrap().set_len(download_info.size) {
+        Ok(_) => (),
+        Err(err) => {
+            return Err(DownloadError::FileError(format!(
+                "failed while setting file length, Error: {}",
+                err
+            )));
+        }
+    }
+
     if download_info.supports_parts {
         info!("Download supports parts");
-        let file_clone = Arc::clone(&file);
-        let handle = tokio::spawn(async move {
-            match download_part(
-                &client,
-                file_clone,
-                DownloadPart {
-                    url: request.url,
-                    range: None,
-                },
-            )
-            .await
-            {
+        let thread_count = 5;
+
+        let part_size = download_info.size / thread_count as u64;
+
+        let mut tasks = Vec::new();
+
+        for i in 0..thread_count {
+            let start = i * part_size;
+            let end = if i == thread_count - 1 {
+                download_info.size - 1
+            } else {
+                start + part_size - 1
+            };
+
+            let part = DownloadPart {
+                url: request.url.clone(),
+                range: Some((start, end)),
+            };
+
+            let file = Arc::clone(&file);
+            let client = client.clone();
+            let handle = tokio::spawn(async move {
+                match download_part(&client, file, part).await {
+                    Ok(_) => (),
+                    Err(err) => {
+                        error!("Failed to download part {}: {:?}", i, err);
+                    }
+                }
+            });
+
+            tasks.push(handle);
+        }
+        // let file_clone = Arc::clone(&file);
+        // let handle = tokio::spawn(async move {
+        //     match download_part(
+        //         &client,
+        //         file_clone,
+        //         DownloadPart {
+        //             url: request.url,
+        //             range: Some((0, download_info.size - 1)),
+        //         },
+        //     )
+        //     .await
+        //     {
+        //         Ok(_) => (),
+        //         Err(err) => {
+        //             error!("Failed to download part: {:?}", err);
+        //         }
+        //     }
+        // });
+
+        for handle in tasks {
+            match handle.await {
                 Ok(_) => (),
                 Err(err) => {
                     error!("Failed to download part: {:?}", err);
                 }
-            }
-        });
-
-        match handle.await {
-            Ok(_) => (),
-            Err(err) => {
-                error!("Failed to download part: {:?}", err);
             }
         }
     } else {
