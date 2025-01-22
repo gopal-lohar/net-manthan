@@ -6,6 +6,7 @@ use serde::Deserialize;
 use std::fs::{File, OpenOptions};
 use std::io::{Seek, SeekFrom, Write};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tracing::{error, info};
 
 #[derive(Debug, Deserialize, Clone)]
@@ -26,6 +27,11 @@ struct DownloadInfo {
 struct DownloadPart {
     url: String,
     range: Option<(u64, u64)>,
+}
+
+struct ThreadInfo {
+    downloaded: u64,
+    speed: u64,
 }
 
 async fn check_download_info(
@@ -83,8 +89,10 @@ async fn download_part(
     client: &Client,
     file: Arc<Mutex<File>>,
     part: DownloadPart,
+    thread_info: Arc<Vec<Mutex<ThreadInfo>>>,
+    thread_id: usize,
 ) -> Result<(), DownloadError> {
-    const BUFFER_SIZE: usize = 1024 * 1024;
+    const BUFFER_SIZE: usize = 1024 * 1024 * 10;
     let mut chunk_sizes = Vec::<f64>::new();
     let response = match {
         match part.range {
@@ -124,6 +132,9 @@ async fn download_part(
         Some((start, _)) => start,
         None => 0,
     };
+    let mut last_position = position;
+    let mut download_speed;
+    let mut last_position_time = std::time::Instant::now();
 
     while let Some(chunk) = stream.next().await {
         match chunk {
@@ -146,6 +157,15 @@ async fn download_part(
                 } else {
                     buffer.extend_from_slice(&chunk);
                 }
+                if last_position != position {
+                    // speed logic
+                    let elapsed = last_position_time.elapsed().as_secs_f64();
+                    last_position_time = std::time::Instant::now();
+                    download_speed = (((position - last_position) as f64) / elapsed) as u64;
+                    last_position = position;
+                    thread_info[thread_id].lock().unwrap().downloaded = position;
+                    thread_info[thread_id].lock().unwrap().speed = download_speed;
+                }
             }
             Err(err) => {
                 return Err(DownloadError::DownloadPartError(format!(
@@ -164,9 +184,16 @@ async fn download_part(
     let total_size: f64 = chunk_sizes.iter().sum();
     info!(
         "Downloaded part size: {}",
-        format!("{} KB", total_size).to_string().green()
+        {
+            if total_size > 1024.0 {
+                format!("{:.2} MB", total_size / 1024.0)
+            } else {
+                format!("{:.2} KB", total_size)
+            }
+        }
+        .green()
     );
-    info!("Chunks: {:?}", chunk_sizes);
+    info!("Chunks: {}", format!("{:?}", chunk_sizes).dimmed());
 
     Ok(())
 }
@@ -216,14 +243,25 @@ pub async fn handle_download(request: DownloadRequest) -> Result<(), DownloadErr
 
     if download_info.supports_parts {
         info!("Download supports parts");
-        let thread_count = 5;
+        let thread_count: usize = 5;
 
         let part_size = download_info.size / thread_count as u64;
 
         let mut tasks = Vec::new();
 
+        let thread_info = Arc::new(
+            (0..thread_count)
+                .map(|_| {
+                    Mutex::new(ThreadInfo {
+                        downloaded: 0,
+                        speed: 0,
+                    })
+                })
+                .collect::<Vec<_>>(),
+        );
+
         for i in 0..thread_count {
-            let start = i * part_size;
+            let start = (i as u64) * part_size;
             let end = if i == thread_count - 1 {
                 download_info.size - 1
             } else {
@@ -237,8 +275,10 @@ pub async fn handle_download(request: DownloadRequest) -> Result<(), DownloadErr
 
             let file = Arc::clone(&file);
             let client = client.clone();
+            let thread_info = Arc::clone(&thread_info);
+
             let handle = tokio::spawn(async move {
-                match download_part(&client, file, part).await {
+                match download_part(&client, file, part, thread_info, i).await {
                     Ok(_) => (),
                     Err(err) => {
                         error!("Failed to download part {}: {:?}", i, err);
@@ -248,24 +288,50 @@ pub async fn handle_download(request: DownloadRequest) -> Result<(), DownloadErr
 
             tasks.push(handle);
         }
-        // let file_clone = Arc::clone(&file);
-        // let handle = tokio::spawn(async move {
-        //     match download_part(
-        //         &client,
-        //         file_clone,
-        //         DownloadPart {
-        //             url: request.url,
-        //             range: Some((0, download_info.size - 1)),
-        //         },
-        //     )
-        //     .await
-        //     {
-        //         Ok(_) => (),
-        //         Err(err) => {
-        //             error!("Failed to download part: {:?}", err);
-        //         }
-        //     }
-        // });
+
+        println!("{}", "\n".repeat(thread_count));
+
+        let start_time = std::time::Instant::now();
+        while thread_info
+            .iter()
+            .map(|thread| {
+                let thread = thread.lock().unwrap();
+                thread.downloaded
+            })
+            .sum::<u64>()
+            < download_info.size
+        {
+            let stdout = std::io::stdout();
+            let mut handle = stdout.lock();
+            write!(handle, "{}", "\x1B[A".repeat(thread_count + 1)).unwrap();
+
+            for (i, thread) in thread_info.iter().enumerate() {
+                let thread = thread.lock().unwrap();
+                write!(
+                    handle,
+                    "\r\tDownloaded: {} MB, Speed: {} KB/s\n",
+                    format!(
+                        "{:.2}",
+                        ((thread.downloaded
+                            - ((i as u64) * (download_info.size / (thread_count as u64))))
+                            as f64)
+                            / (1024.0 * 1024.0)
+                    )
+                    .green(),
+                    format!("{:.2}", (thread.speed as f64) / 1024.0).yellow()
+                )
+                .unwrap();
+            }
+            write!(
+                handle,
+                "time elapsed {:?} \n",
+                start_time.elapsed().as_secs()
+            )
+            .unwrap();
+
+            handle.flush().unwrap();
+            std::thread::sleep(Duration::from_millis(200));
+        }
 
         for handle in tasks {
             match handle.await {
@@ -274,6 +340,18 @@ pub async fn handle_download(request: DownloadRequest) -> Result<(), DownloadErr
                     error!("Failed to download part: {:?}", err);
                 }
             }
+        }
+
+        for d_info in thread_info.iter() {
+            info!(
+                "Downloaded: {} MB with speed: {} KB/s",
+                format!(
+                    "{:.2}",
+                    (d_info.lock().unwrap().downloaded as f64) / (1024.0 * 1024.0)
+                )
+                .green(),
+                format!("{:.2}", (d_info.lock().unwrap().speed as f64) / 1024.0)
+            );
         }
     } else {
         info!("Download does not support parts");
