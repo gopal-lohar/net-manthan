@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <style>
+            html,
+            body {
+                color-scheme: dark light;
+            }
+            body {
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            }
+            .container {
+                padding-inline: 1rem;
+                padding-bottom: 1rem;
+            }
+            .indicator {
+                text-align: center;
+                border-radius: 0.25rem;
+                padding: 1rem;
+            }
+
+            .connected {
+                background-color: hsl(120, 100%, 40%);
+                color: white;
+            }
+
+            .not-connected {
+                background-color: hsl(0, 100%, 40%);
+                color: white;
+            }
+
+            .hidden {
+                display: none;
+            }
+
+            p {
+                text-align: center;
+            }
+        </style>
+        <title>Net Manthan</title>
+        <script src="popup.js" defer></script>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Net Manthan</h1>
+            <div class="indicator connected hidden">connected</div>
+            <div class="indicator not-connected">not connected</div>
+            <p>(does not work)</p>
+        </div>
+    </body>
+</html>

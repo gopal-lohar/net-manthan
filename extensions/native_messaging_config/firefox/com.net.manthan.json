@@ -1,0 +1,7 @@
+{
+  "name": "com.net.manthan",
+  "description": "Native messaging host for net-manthan download manager extension.",
+  "path": "path/to/binary",
+  "type": "stdio",
+  "allowed_extensions": ["net-manthan@example.com"]
+}
