@@ -1,57 +1,43 @@
-use serde::{Deserialize, Serialize};
-use std::{
-    io::{self, Read, Write},
-    os::unix::net::UnixStream,
-};
+use chrome_native_messaging::event_loop;
+use serde::Serialize;
+use serde_json::Value;
+use std::{io::Write, os::unix::net::UnixStream};
 
-#[derive(Debug, Serialize, Deserialize)]
-struct DownloadRequest {
-    url: String,
-    filename: String,
-    filesize: Option<i64>,
-    mime: Option<String>,
-    referrer: Option<String>,
-    headers: Option<Vec<String>>,
+#[derive(Serialize)]
+struct BasicMessage<'a> {
+    payload: &'a str,
 }
 
-#[derive(Debug, Serialize)]
-struct Response {
-    status: String,
-}
+const SOCKET_PATH: &str = "/tmp/net-manthan.sock";
 
-fn read_message() -> io::Result<Vec<u8>> {
-    let mut length_bytes = [0u8; 4];
-    io::stdin().read_exact(&mut length_bytes)?;
-    let length = u32::from_ne_bytes(length_bytes);
-    let mut content = vec![0; length as usize];
-    io::stdin().read_exact(&mut content)?;
-    Ok(content)
-}
+fn main() {
+    event_loop(|value| match value {
+        Value::Null => Err("null payload"),
+        Value::Object(request) => {
+            let request = match serde_json::to_string(&request) {
+                Ok(request) => request.as_bytes().to_vec(),
+                Err(_) => return Err("invalid payload"),
+            };
 
-fn write_message(content: &[u8]) -> io::Result<()> {
-    let length = content.len() as u32;
-    io::stdout().write_all(&length.to_ne_bytes())?;
-    io::stdout().write_all(content)?;
-    io::stdout().flush()?;
-    Ok(())
-}
+            let mut stream = match UnixStream::connect(SOCKET_PATH) {
+                Ok(stream) => stream,
+                Err(_) => {
+                    return Ok(BasicMessage {
+                        payload: "colud not connect to the daemon",
+                    })
+                }
+            };
 
-fn main() -> io::Result<()> {
-    while let Ok(msg) = read_message() {
-        let request: DownloadRequest = serde_json::from_slice(&msg)?;
+            if let Err(_) = stream.write_all(&request) {
+                return Ok(BasicMessage {
+                    payload: "could not send the request",
+                });
+            }
 
-        let mut stream = UnixStream::connect("/tmp/net-manthan.sock")?;
-        stream.write_all(&serde_json::to_vec(&request)?)?;
-
-        // let mut response = String::new();
-        // stream.read_to_string(&mut response)?;
-
-        let response = Response {
-            status: "received".into(),
-        };
-
-        let response_json = serde_json::to_vec(&response)?;
-        write_message(&response_json)?;
-    }
-    Ok(())
+            return Ok(BasicMessage {
+                payload: "Download request sent",
+            });
+        }
+        _ => Err("invalid payload"),
+    });
 }

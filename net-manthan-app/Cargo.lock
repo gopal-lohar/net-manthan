@@ -84,6 +84,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "chrome_native_messaging"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "045738182a1d07dedd1adab91cb165eb536076d265124869e1fea59a65c0b34c"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "colored"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -659,6 +669,7 @@ dependencies = [
 name = "net-manthan-app"
 version = "0.1.0"
 dependencies = [
+ "chrome_native_messaging",
  "colored",
  "futures-util",
  "reqwest",
