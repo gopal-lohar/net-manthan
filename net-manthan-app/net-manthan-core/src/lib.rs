@@ -14,11 +14,11 @@ use tracing::{error, info, warn};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct DownloadRequest {
-    url: String,
-    filename: String,
-    mime: Option<String>,
-    referrer: Option<String>,
-    headers: Option<Vec<String>>,
+    pub url: String,
+    pub filename: String,
+    pub mime: Option<String>,
+    pub referrer: Option<String>,
+    pub headers: Option<Vec<String>>,
 }
 
 #[derive(Debug)]
@@ -236,6 +236,7 @@ async fn log_prgress(mut rx: mpsc::Receiver<DownloadProgress>, thread_count: usi
         }
     }
 
+    println!("{}", "\x1B[B".repeat(5));
     println!(
         "Average chunk size for threads {}",
         format_bytes(
@@ -254,8 +255,6 @@ async fn log_prgress(mut rx: mpsc::Receiver<DownloadProgress>, thread_count: usi
     {
         println!("{}", "Download failed".red());
     }
-
-    println!("{}", "\x1B[B".repeat(5));
 }
 
 async fn download_part(
