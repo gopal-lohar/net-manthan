@@ -1,6 +1,4 @@
-pub mod download;
-pub mod errors;
-
+use net_manthan_core::{download, DownloadRequest};
 use std::{
     io::{Read, Write},
     os::unix::net::UnixListener,
@@ -11,9 +9,8 @@ use tracing::{error, info, Level};
 const SOCKET_PATH: &str = "/tmp/net-manthan.sock";
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() {
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();
-
     if Path::new(SOCKET_PATH).exists() {
         std::fs::remove_file(SOCKET_PATH).unwrap();
     }
@@ -26,14 +23,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(mut stream) => {
                 let mut buffer = Vec::new();
                 match stream.read_to_end(&mut buffer) {
-                    Ok(_) => match serde_json::from_slice::<download::DownloadRequest>(&buffer) {
+                    Ok(_) => match serde_json::from_slice::<DownloadRequest>(&buffer) {
                         Ok(request) => {
-                            info!("Download request received: {:?}", request);
+                            info!("Download request received");
                             info!("Starting download");
 
-                            download::handle_download(request).await?;
-
-                            info!("Download finished");
+                            match download(request).await {
+                                Ok(_) => {
+                                    info!("Download finished");
+                                }
+                                Err(e) => {
+                                    error!("Download Failed: {}", e);
+                                }
+                            }
 
                             let _ = stream.write_all(b"OK");
                         }
@@ -45,6 +47,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Err(e) => error!("Connection failed: {}", e),
         }
     }
-
-    Ok(())
 }

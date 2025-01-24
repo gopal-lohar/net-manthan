@@ -1,0 +1,13 @@
+[package]
+name = "net-manthan-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+reqwest.workspace = true
+tracing.workspace = true
+colored.workspace = true
+futures-util = "0.3.31"

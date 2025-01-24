@@ -1,7 +1,0 @@
-{
-  "name": "com.net.manthan",
-  "description": "Native messaging host for down-poc extension.",
-  "path": "path/to/binary",
-  "type": "stdio",
-  "allowed_extensions": ["net-manthan@example.com"]
-}
