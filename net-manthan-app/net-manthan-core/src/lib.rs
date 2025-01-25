@@ -3,7 +3,6 @@ use colored::Colorize;
 use errors::DownloadError;
 use futures_util::StreamExt;
 use reqwest::{header, Client};
-use serde::Deserialize;
 use std::{
     fs::OpenOptions,
     io::{BufWriter, Seek, Write},
@@ -11,15 +10,7 @@ use std::{
 };
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct DownloadRequest {
-    pub url: String,
-    pub filename: String,
-    pub mime: Option<String>,
-    pub referrer: Option<String>,
-    pub headers: Option<Vec<String>>,
-}
+use utils::DownloadRequest;
 
 #[derive(Debug)]
 struct DownloadInfo {
