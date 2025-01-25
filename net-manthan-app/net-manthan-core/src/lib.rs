@@ -1,4 +1,7 @@
+pub mod download_part;
 pub mod errors;
+pub mod get_download_info;
+
 use colored::Colorize;
 use errors::DownloadError;
 use futures_util::StreamExt;

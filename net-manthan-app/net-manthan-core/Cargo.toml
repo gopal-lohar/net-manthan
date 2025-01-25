@@ -12,3 +12,4 @@ reqwest.workspace = true
 tracing.workspace = true
 colored.workspace = true
 futures-util = "0.3.31"
+crossbeam-channel = "0.5.14"
