@@ -31,8 +31,8 @@ async fn check_download_info(request: &DownloadRequest) -> Result<DownloadInfo, 
 pub async fn get_download_info(
     download_id: u64,
     thread_count: usize,
-    request: DownloadRequest,
-) -> Result<Vec<DownloadPart>, DownloadError> {
+    request: &DownloadRequest,
+) -> Result<(Vec<DownloadPart>, u64), DownloadError> {
     let mut parts = Vec::<DownloadPart>::new();
     let download_info = check_download_info(&request).await?;
     let thread_count = match download_info.resume {
@@ -57,5 +57,5 @@ pub async fn get_download_info(
         };
         parts.push(part);
     }
-    Ok(parts)
+    Ok((parts, download_info.size))
 }

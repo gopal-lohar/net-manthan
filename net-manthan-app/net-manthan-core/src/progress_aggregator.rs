@@ -15,7 +15,8 @@ struct DownloadProgress {
     chunks: HashMap<u32, ChunkProgress>,
 }
 
-pub fn progress_aggregator(
+// TODO: close this thread when the download is complete
+pub async fn progress_aggregator(
     download_id: u64,
     progress_receiver: Receiver<ChunkProgress>,
     udpate_interval: Duration,
