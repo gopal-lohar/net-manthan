@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs::OpenOptions,
     sync::{atomic::AtomicBool, Arc},
     time::Duration,
@@ -9,13 +10,20 @@ use download_part::{download_part, ChunkProgress};
 use errors::DownloadError;
 use get_download_info::get_download_info;
 use progress_aggregator::progress_aggregator;
-use tracing::info;
+use tokio::sync::broadcast;
 use utils::DownloadRequest;
 
 pub mod download_part;
 pub mod errors;
 pub mod get_download_info;
 pub mod progress_aggregator;
+
+#[derive(Clone)]
+pub struct DownloadProgress {
+    // TODO: check what is use of download_id
+    pub download_id: u64,
+    pub chunks: HashMap<u32, ChunkProgress>,
+}
 
 fn create_download_file(filename: &String, size: u64) -> Result<(), DownloadError> {
     match OpenOptions::new().create(true).write(true).open(filename) {
@@ -27,25 +35,28 @@ fn create_download_file(filename: &String, size: u64) -> Result<(), DownloadErro
     }
 }
 
-pub async fn download(request: DownloadRequest) -> Result<(), DownloadError> {
-    const DOWNLOAD_ID: u64 = 69;
+pub async fn download(
+    download_id: u64,
+    request: DownloadRequest,
+    cancel_token: Arc<AtomicBool>,
+    broadcast_sender: broadcast::Sender<DownloadProgress>,
+) -> Result<(), DownloadError> {
     const THREAD_COUNT: usize = 5;
 
-    let cancel_token = Arc::new(AtomicBool::new(false));
     let mut download_handles = Vec::new();
     let (aggregator_sender, aggregator_receiver) = bounded::<ChunkProgress>(100);
     let (download_chunks, download_size) =
-        get_download_info(DOWNLOAD_ID, THREAD_COUNT, &request).await?;
+        get_download_info(download_id, THREAD_COUNT, &request).await?;
 
-    info!("Download starting");
     create_download_file(&request.filename, download_size)?;
 
     {
         let cancel_token = cancel_token.clone();
         let progress_receiver = aggregator_receiver.clone();
         tokio::spawn(progress_aggregator(
-            DOWNLOAD_ID,
+            download_id,
             progress_receiver,
+            broadcast_sender,
             Duration::from_millis(500),
             cancel_token,
         ));
@@ -77,6 +88,8 @@ pub async fn download(request: DownloadRequest) -> Result<(), DownloadError> {
             }
         }
     }
+
+    cancel_token.store(true, std::sync::atomic::Ordering::Relaxed);
 
     Ok(())
 }

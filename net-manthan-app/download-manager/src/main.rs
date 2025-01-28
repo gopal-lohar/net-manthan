@@ -1,9 +1,10 @@
 pub mod download_db_manager;
+mod download_manager;
 
 use bincode;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use crate::download_manager::DownloadManager;
 // use download_db_manager::DatabaseManager;
-use net_manthan_core::download;
 // use serde::{Deserialize, Serialize};
 // use std::io::prelude::*;
 use std::net::{TcpListener, TcpStream};
@@ -19,7 +20,7 @@ use utils::IPC_SOCKET_ADDRESS;
 
 // const SOCKET_PATH: &str = "/tmp/net-manthan.sock";
 
-async fn handle_ipc_client(mut stream: TcpStream) {
+async fn handle_ipc_client(mut stream: TcpStream, download_manager: Arc<Mutex<DownloadManager>>) {
     info!("New connection: {}", stream.peer_addr().unwrap());
     let mut buffer = Vec::new();
 
@@ -46,14 +47,9 @@ async fn handle_ipc_client(mut stream: TcpStream) {
                 let response = match message {
                     Message::HeartBeat => Message::HeartBeat,
                     Message::DownloadRequest(request) => {
-                        match download(request).await {
-                            Ok(_) => {
-                                info!("Download finished");
-                            }
-                            Err(e) => {
-                                error!("Download Failed: {}", e);
-                            }
-                        }
+                        let download_id = 1;
+                        download_manager.lock().unwrap().start_download(download_id, request);
+                        
                         Message::DownnloadResponse("Download Finished".to_string())
                     }
                     _ => Message::InvalidMessage,
@@ -86,6 +82,9 @@ fn main() {
     // let db_path = Path::new("/tmp/downloads.db");
     // let db_manager = DatabaseManager::new(db_path);
 
+
+    let download_manager = Arc::new(Mutex::new(DownloadManager::new()));
+
     let listener = match TcpListener::bind(IPC_SOCKET_ADDRESS) {
         Ok(listener) => listener,
         Err(e) => {
@@ -98,9 +97,10 @@ fn main() {
         match stream {
             Ok(stream) => {
                 let rt_clone = rt.clone();
+                let download_manager_clone = download_manager.clone();
                 thread::spawn(move || {
                     rt_clone.block_on(async {
-                        handle_ipc_client(stream).await;
+                        handle_ipc_client(stream, download_manager_clone).await;
                     });
                 });
             }
