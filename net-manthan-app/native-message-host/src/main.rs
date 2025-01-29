@@ -1,7 +1,8 @@
 use chrome_native_messaging::event_loop;
+use net_manthan_core::types::Message;
 use serde::Serialize;
 use serde_json::Value;
-use utils::{Client, Message, IPC_SOCKET_ADDRESS};
+use utils::{Client, IPC_SOCKET_ADDRESS};
 
 #[derive(Serialize)]
 struct ResponseToExtension {

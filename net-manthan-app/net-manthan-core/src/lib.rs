@@ -11,12 +11,13 @@ use errors::DownloadError;
 use get_download_info::get_download_info;
 use progress_aggregator::progress_aggregator;
 use tokio::sync::broadcast;
-use utils::DownloadRequest;
+use crate::types::DownloadRequest;
 
 pub mod download_part;
 pub mod errors;
 pub mod get_download_info;
 pub mod progress_aggregator;
+pub mod types;
 
 #[derive(Clone)]
 pub struct DownloadProgress {

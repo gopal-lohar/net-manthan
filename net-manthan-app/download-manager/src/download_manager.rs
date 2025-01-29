@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::{atomic::AtomicBool, Arc}};
 
 use net_manthan_core::{download, DownloadProgress};
 use tokio::sync::broadcast;
-use utils::DownloadRequest;
+use net_manthan_core::types::DownloadRequest;
 
 pub struct DownloadHandle {
     pub cancel_token: Arc<AtomicBool>,

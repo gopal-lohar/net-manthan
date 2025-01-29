@@ -760,6 +760,7 @@ name = "native-message-host"
 version = "0.1.0"
 dependencies = [
  "chrome_native_messaging",
+ "net-manthan-core",
  "serde",
  "serde_json",
  "utils",
@@ -794,7 +795,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
- "utils",
 ]
 
 [[package]]
@@ -1538,6 +1538,7 @@ name = "utils"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "net-manthan-core",
  "serde",
 ]
 

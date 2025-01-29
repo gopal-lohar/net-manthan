@@ -1,27 +1,10 @@
 use bincode;
-use serde::{Deserialize, Serialize};
+use net_manthan_core::types::Message;
 use std::io::prelude::*;
 use std::net::TcpStream;
 
+
 pub const IPC_SOCKET_ADDRESS: &str = "127.0.0.1:8080";
-
-// Shared message type between client and server
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum Message {
-    HeartBeat,
-    DownloadRequest(DownloadRequest),
-    DownnloadResponse(String),
-    InvalidMessage,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct DownloadRequest {
-    pub url: String,
-    pub filename: String,
-    pub mime: Option<String>,
-    pub referrer: Option<String>,
-    pub headers: Option<Vec<String>>,
-}
 
 pub struct Client {
     stream: TcpStream,

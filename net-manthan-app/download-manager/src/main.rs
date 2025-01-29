@@ -15,7 +15,7 @@ use std::{
 };
 use tokio::runtime::Runtime;
 use tracing::{error, info, Level};
-use utils::Message;
+use net_manthan_core::types::Message;
 use utils::IPC_SOCKET_ADDRESS;
 
 // const SOCKET_PATH: &str = "/tmp/net-manthan.sock";
