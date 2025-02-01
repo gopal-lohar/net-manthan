@@ -1,5 +1,5 @@
-use crate::errors::DownloadError;
-use chrono::{DateTime, Duration, Utc};
+use crate::{errors::DownloadError, types::ChunkProgress};
+use chrono::{Duration, Utc};
 use crossbeam_channel::Sender;
 use futures_util::StreamExt;
 use reqwest::{header, Client};
@@ -13,17 +13,6 @@ use std::{
 };
 
 const BUFFER_SIZE: usize = 1024 * 1024;
-
-#[derive(Clone)]
-pub struct ChunkProgress {
-    pub download_id: u64,
-    pub chunk_id: u32,
-    pub bytes_downloaded: u64,
-    pub total_bytes: u64,
-    pub speed: f64,
-    pub timestamp: DateTime<Utc>,
-    pub error: bool,
-}
 
 pub struct DownloadPart {
     pub download_id: u64,

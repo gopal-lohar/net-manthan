@@ -1,4 +1,4 @@
-use crate::download_part::ChunkProgress;
+use crate::types::ChunkProgress;
 use crate::DownloadProgress;
 use chrono::{Duration, Utc};
 use crossbeam_channel::Receiver;

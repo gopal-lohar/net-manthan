@@ -3,7 +3,6 @@ use net_manthan_core::types::Message;
 use std::io::prelude::*;
 use std::net::TcpStream;
 
-
 pub const IPC_SOCKET_ADDRESS: &str = "127.0.0.1:8080";
 
 pub struct Client {

@@ -1,12 +1,13 @@
 pub mod download_db_manager;
 mod download_manager;
 
+use crate::download_manager::DownloadManager;
 use bincode;
 use std::sync::{Arc, Mutex};
-use crate::download_manager::DownloadManager;
 // use download_db_manager::DatabaseManager;
 // use serde::{Deserialize, Serialize};
 // use std::io::prelude::*;
+use net_manthan_core::types::Message;
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 use std::{
@@ -15,7 +16,6 @@ use std::{
 };
 use tokio::runtime::Runtime;
 use tracing::{error, info, Level};
-use net_manthan_core::types::Message;
 use utils::IPC_SOCKET_ADDRESS;
 
 // const SOCKET_PATH: &str = "/tmp/net-manthan.sock";
@@ -48,10 +48,16 @@ async fn handle_ipc_client(mut stream: TcpStream, download_manager: Arc<Mutex<Do
                     Message::HeartBeat => Message::HeartBeat,
                     Message::DownloadRequest(request) => {
                         let download_id = 1;
-                        download_manager.lock().unwrap().start_download(download_id, request);
-                        
+                        download_manager
+                            .lock()
+                            .unwrap()
+                            .start_download(download_id, request);
+
                         Message::DownnloadResponse("Download Finished".to_string())
                     }
+                    Message::ProgressRequest(_) => {
+                        Message::ProgressResponse(Vec::new())
+                    },
                     _ => Message::InvalidMessage,
                 };
                 let serialized = bincode::serialize(&response).unwrap();
@@ -81,7 +87,6 @@ fn main() {
 
     // let db_path = Path::new("/tmp/downloads.db");
     // let db_manager = DatabaseManager::new(db_path);
-
 
     let download_manager = Arc::new(Mutex::new(DownloadManager::new()));
 

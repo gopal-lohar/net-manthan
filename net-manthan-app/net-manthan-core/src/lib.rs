@@ -1,7 +1,8 @@
+use crate::types::ChunkProgress;
 use crate::types::DownloadRequest;
 use chrono::Duration;
 use crossbeam_channel::bounded;
-use download_part::{download_part, ChunkProgress};
+use download_part::download_part;
 use errors::DownloadError;
 use get_download_info::get_download_info;
 use progress_aggregator::progress_aggregator;
