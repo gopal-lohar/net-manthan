@@ -63,14 +63,42 @@ async fn handle_ipc_client(mut stream: TcpStream, download_manager: Arc<Mutex<Do
                             .active_downloads
                             .get_mut(&download_id)
                         {
-                            Some(download) => match download.progress_receiver.recv().await {
-                                Ok(progress) => {
-                                    info!("progress: {:?}", progress);
-                                    info!("Progress request for download_id: {}", download_id);
-                                    Message::ProgressResponse(progress.chunks)
-                                }
-                                Err(_) => Message::InvalidMessage,
-                            },
+                            Some(download) => {
+                                loop {
+                                    match download.progress_receiver.recv().await {
+                                        Ok(progress) => {
+                                            info!("progress: {:?}", progress);
+                                            info!(
+                                                "Progress request for download_id: {}",
+                                                download_id
+                                            );
+                                            // ------------ temp area starts ------------
+
+                                            let serialized = bincode::serialize(
+                                                &Message::ProgressResponse(progress.chunks),
+                                            )
+                                            .unwrap();
+                                            if let Err(e) = stream
+                                                .write_all(&(serialized.len() as u64).to_le_bytes())
+                                            {
+                                                error!("Failed to send response length: {}", e);
+                                                return;
+                                            }
+                                            if let Err(e) = stream.write_all(&serialized) {
+                                                error!("Failed to send response: {}", e);
+                                                return;
+                                            }
+                                            stream.flush().unwrap_or_else(|e| {
+                                                error!("Failed to flush: {}", e)
+                                            });
+
+                                            // ------------ temp area ends ------------
+
+                                        }
+                                        Err(_) => {},
+                                    }
+                                };
+                            }
                             None => Message::InvalidMessage,
                         }
                     }

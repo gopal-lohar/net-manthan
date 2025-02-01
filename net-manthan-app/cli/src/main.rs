@@ -12,13 +12,12 @@ fn main() {
         }
     };
 
-    match client.send_and_receive(Message::ProgressRequest(vec![1])) {
-        Ok(response) => {
-            println!("Response: {:?}", response);
-        }
-        Err(e) => {
-            println!("Could not send the request. ERR: {}", e);
-            return;
-        }
+    let handler = |message: Message| {
+        println!("Received update: {:?}", message);
+        // You can do anything here, like updating a UI, logging, etc.
+    };
+
+    if let Err(e) = client.send_and_stream(Message::ProgressRequest(vec![1]), handler) {
+        println!("Error in streaming: {}", e);
     }
 }
