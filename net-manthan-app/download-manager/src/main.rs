@@ -55,9 +55,25 @@ async fn handle_ipc_client(mut stream: TcpStream, download_manager: Arc<Mutex<Do
 
                         Message::DownnloadResponse("Download Finished".to_string())
                     }
-                    Message::ProgressRequest(_) => {
-                        Message::ProgressResponse(Vec::new())
-                    },
+                    Message::ProgressRequest(download_ids) => {
+                        let download_id = download_ids[0];
+                        match download_manager
+                            .lock()
+                            .unwrap()
+                            .active_downloads
+                            .get_mut(&download_id)
+                        {
+                            Some(download) => match download.progress_receiver.recv().await {
+                                Ok(progress) => {
+                                    info!("progress: {:?}", progress);
+                                    info!("Progress request for download_id: {}", download_id);
+                                    Message::ProgressResponse(progress.chunks)
+                                }
+                                Err(_) => Message::InvalidMessage,
+                            },
+                            None => Message::InvalidMessage,
+                        }
+                    }
                     _ => Message::InvalidMessage,
                 };
                 let serialized = bincode::serialize(&response).unwrap();

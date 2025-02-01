@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = [
+members = [ "cli",
     "download-manager",
     "native-message-host",
     "net-manthan-core",

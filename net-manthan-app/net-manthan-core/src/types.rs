@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +11,7 @@ pub enum Message {
     DownnloadResponse(String),
     InvalidMessage,
     ProgressRequest(Vec<u64>),
-    ProgressResponse(Vec<ChunkProgress>),
+    ProgressResponse(HashMap<u32, ChunkProgress>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

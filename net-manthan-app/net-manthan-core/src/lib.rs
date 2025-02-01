@@ -19,7 +19,7 @@ pub mod get_download_info;
 pub mod progress_aggregator;
 pub mod types;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DownloadProgress {
     // TODO: check what is use of download_id
     pub download_id: u64,
