@@ -1,6 +1,6 @@
+use crate::types::DownloadRequest;
 use crate::{download_part::DownloadPart, errors::DownloadError};
 use reqwest::{header, Client};
-use crate::types::DownloadRequest;
 
 struct DownloadInfo {
     size: u64,

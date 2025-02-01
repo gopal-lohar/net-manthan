@@ -1,4 +1,3 @@
-
 use serde::{Deserialize, Serialize};
 
 // Shared message type between client and server
@@ -10,7 +9,6 @@ pub enum Message {
     InvalidMessage,
 }
 
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DownloadRequest {
     pub url: String,
@@ -19,4 +17,3 @@ pub struct DownloadRequest {
     pub referrer: Option<String>,
     pub headers: Option<Vec<String>>,
 }
-

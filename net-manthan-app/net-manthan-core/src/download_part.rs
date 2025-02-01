@@ -1,4 +1,5 @@
 use crate::errors::DownloadError;
+use chrono::{DateTime, Duration, Utc};
 use crossbeam_channel::Sender;
 use futures_util::StreamExt;
 use reqwest::{header, Client};
@@ -9,7 +10,6 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::{Duration, Instant},
 };
 
 const BUFFER_SIZE: usize = 1024 * 1024;
@@ -21,7 +21,7 @@ pub struct ChunkProgress {
     pub bytes_downloaded: u64,
     pub total_bytes: u64,
     pub speed: f64,
-    pub timestamp: Instant,
+    pub timestamp: DateTime<Utc>,
     pub error: bool,
 }
 
@@ -102,7 +102,7 @@ pub async fn download_part(
 
     let mut stream = response.bytes_stream();
 
-    let start_time = std::time::Instant::now();
+    let start_time = Utc::now();
     let mut last_update_time = start_time;
     let mut bytes_downloaded_last: u64 = 0;
     let mut speed_in_bytes: u64 = 0;
@@ -114,13 +114,13 @@ pub async fn download_part(
                     .write_all(&chunk)
                     .map_err(DownloadError::from_write_error)?;
                 bytes_downloaded_last += chunk.len() as u64;
-                let elapsed = last_update_time.elapsed();
+                let elapsed = Utc::now() - last_update_time;
                 if elapsed >= udpate_interval {
                     speed_in_bytes =
-                        ((bytes_downloaded_last as f64) / elapsed.as_secs_f64()) as u64;
+                        ((bytes_downloaded_last as f64) / elapsed.num_seconds() as f64) as u64;
                     bytes_downloaded += bytes_downloaded_last;
                     bytes_downloaded_last = 0;
-                    last_update_time = std::time::Instant::now();
+                    last_update_time = Utc::now();
 
                     let progress = ChunkProgress {
                         download_id: part.download_id,
@@ -128,7 +128,7 @@ pub async fn download_part(
                         bytes_downloaded,
                         total_bytes: download_size,
                         speed: speed_in_bytes as f64,
-                        timestamp: std::time::Instant::now(),
+                        timestamp: Utc::now(),
                         error: false,
                     };
 
@@ -156,7 +156,7 @@ pub async fn download_part(
         bytes_downloaded,
         total_bytes: download_size,
         speed: speed_in_bytes as f64,
-        timestamp: std::time::Instant::now(),
+        timestamp: Utc::now(),
         error: false,
     };
     match progress_sender.send(progress) {

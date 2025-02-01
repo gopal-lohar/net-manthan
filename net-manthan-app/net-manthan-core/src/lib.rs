@@ -1,17 +1,16 @@
-use std::{
-    collections::HashMap,
-    fs::OpenOptions,
-    sync::{atomic::AtomicBool, Arc},
-    time::Duration,
-};
-
+use crate::types::DownloadRequest;
+use chrono::Duration;
 use crossbeam_channel::bounded;
 use download_part::{download_part, ChunkProgress};
 use errors::DownloadError;
 use get_download_info::get_download_info;
 use progress_aggregator::progress_aggregator;
+use std::{
+    collections::HashMap,
+    fs::OpenOptions,
+    sync::{atomic::AtomicBool, Arc},
+};
 use tokio::sync::broadcast;
-use crate::types::DownloadRequest;
 
 pub mod download_part;
 pub mod errors;
@@ -43,14 +42,11 @@ pub async fn download(
     broadcast_sender: broadcast::Sender<DownloadProgress>,
 ) -> Result<(), DownloadError> {
     const THREAD_COUNT: usize = 5;
-
     let mut download_handles = Vec::new();
     let (aggregator_sender, aggregator_receiver) = bounded::<ChunkProgress>(100);
     let (download_chunks, download_size) =
         get_download_info(download_id, THREAD_COUNT, &request).await?;
-
     create_download_file(&request.filename, download_size)?;
-
     {
         let cancel_token = cancel_token.clone();
         let progress_receiver = aggregator_receiver.clone();
@@ -58,7 +54,7 @@ pub async fn download(
             download_id,
             progress_receiver,
             broadcast_sender,
-            Duration::from_millis(500),
+            Duration::milliseconds(500),
             cancel_token,
         ));
     }
@@ -69,7 +65,7 @@ pub async fn download(
         let handle = tokio::spawn(download_part(
             chunk,
             aggregator_sender,
-            Duration::from_millis(1000),
+            Duration::milliseconds(1000),
             cancel_token,
         ));
         download_handles.push(handle);
@@ -91,6 +87,5 @@ pub async fn download(
     }
 
     cancel_token.store(true, std::sync::atomic::Ordering::Relaxed);
-
     Ok(())
 }
