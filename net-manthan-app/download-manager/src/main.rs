@@ -93,11 +93,10 @@ async fn handle_ipc_client(mut stream: TcpStream, download_manager: Arc<Mutex<Do
                                             });
 
                                             // ------------ temp area ends ------------
-
                                         }
-                                        Err(_) => {},
+                                        Err(_) => {}
                                     }
-                                };
+                                }
                             }
                             None => Message::InvalidMessage,
                         }
