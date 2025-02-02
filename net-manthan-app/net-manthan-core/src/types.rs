@@ -47,15 +47,8 @@ pub struct NetManthanConfig {
 
 // ----------------- IPC MESSAGES -----------------
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum IpcMessage {
-    Request(IpcRequest),
-    Response(IpcResponse),
-    HeartBeat,
-    InvalidMessage,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum IpcRequest {
+    HeartBeat,
     ListDownloads {
         incomplete_only: bool,
         detailed: bool,
@@ -92,6 +85,7 @@ pub enum IpcRequest {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum IpcResponse {
+    HeartBeat,
     Success,
     Error(String),
 
