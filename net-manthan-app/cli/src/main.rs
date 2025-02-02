@@ -1,60 +1,177 @@
-use std::collections::HashMap;
-use std::io::{stdout, Write};
+use crate::run::run;
+use clap::{Parser, Subcommand};
+use color_eyre::Result;
+use std::path::PathBuf;
+use tracing::info;
+use tracing_subscriber::{self, EnvFilter};
 
-use net_manthan_core::types::{ChunkProgress, Message};
-use utils::{Client, IPC_SOCKET_ADDRESS};
+mod run;
 
-fn render_progress(progress: &HashMap<u32, ChunkProgress>) {
-    let width = 50; // Progress bar width
-    print!("\x1B[2J\x1B[H"); // Move cursor to the top without clearing the screen
+/// Advanced Download Manager CLI
+#[derive(Parser)]
+#[command(author, version, about)]
+pub struct Cli {
+    #[arg(short, long, action = clap::ArgAction::Count)]
+    debug: u8,
 
-    let mut chunk_ids: Vec<_> = progress.keys().copied().collect();
-    chunk_ids.sort(); // Ensure fixed order
-
-    for (index, chunk_id) in chunk_ids.iter().enumerate() {
-        let chunk = &progress[chunk_id];
-        let percentage = chunk.bytes_downloaded as f64 / chunk.total_bytes as f64;
-        let filled = (percentage * width as f64) as usize;
-        let bar = format!(
-            "\x1B[32m{}\x1B[0m{}", // Green `#` and spaces
-            "#".repeat(filled),
-            " ".repeat(width - filled)
-        );
-
-        print!("\x1B[{};0H", index + 1); // Move cursor to line (index + 1)
-        println!(
-            "Chunk {} [{}] {:.2}% @ {:.2} KB/s",
-            chunk.chunk_id,
-            bar,
-            percentage * 100.0,
-            chunk.speed / 1024.0
-        );
-    }
-
-    stdout().flush().unwrap();
+    #[command(subcommand)]
+    command: Commands,
 }
 
-fn main() {
-    println!("Hello, world!");
+#[derive(Subcommand)]
+pub enum Commands {
+    /// List downloads with optional filters
+    List {
+        /// Show only incomplete downloads
+        #[arg(short, long)]
+        incomplete: bool,
 
-    let mut client = match Client::new(IPC_SOCKET_ADDRESS) {
-        Ok(client) => client,
-        Err(e) => {
-            println!("Could not connect to the server. ERR: {}", e);
-            return;
-        }
-    };
+        /// Show detailed information
+        #[arg(short, long)]
+        detailed: bool,
 
-    let handler = |message: Message| {
-        // println!("Received update: {:?}", message);
-        match message {
-            Message::ProgressResponse(progress) => render_progress(&progress),
-            _ => println!("Received message: {:?}", message),
-        }
-        // You can do anything here, like updating a UI, logging, etc.
-    };
+        /// Number of recent downloads to show
+        #[arg(short, long)]
+        limit: Option<usize>,
+    },
 
-    if let Err(e) = client.send_and_stream(Message::ProgressRequest(vec![1]), handler) {
-        println!("Error in streaming: {}", e);
-    }
+    /// Start a new download
+    Start {
+        /// Download URL
+        url: String,
+
+        /// Custom output path (optional)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Number of threads (default from config)
+        #[arg(short, long)]
+        threads: Option<u8>,
+    },
+
+    /// Resume paused downloads
+    Resume {
+        /// Download IDs to resume (if none, resumes all)
+        ids: Vec<u64>,
+    },
+
+    /// Pause active downloads
+    Pause {
+        /// Download IDs to pause (if none, pauses all)
+        ids: Vec<u64>,
+    },
+
+    /// Show real-time progress of downloads
+    Watch {
+        /// Download IDs to watch (if none, watches all)
+        ids: Vec<u64>,
+
+        /// Update interval in milliseconds
+        #[arg(short, long, default_value = "500")]
+        interval: u64,
+
+        /// Show detailed progress information
+        #[arg(short, long)]
+        detailed: bool,
+    },
+
+    /// Remove downloads
+    Remove {
+        /// Download IDs to remove
+        ids: Vec<u64>,
+
+        /// Also delete downloaded files
+        #[arg(short, long)]
+        delete_files: bool,
+    },
+
+    /// Update download properties
+    Update {
+        /// Download ID to update
+        id: u64,
+
+        /// New URL for the download
+        #[arg(short, long)]
+        url: Option<String>,
+
+        /// New output path
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+
+    /// Manage configuration
+    Config {
+        #[command(subcommand)]
+        action: ConfigCommands,
+    },
 }
+
+#[derive(Subcommand)]
+pub enum ConfigCommands {
+    /// Show current configuration
+    Show,
+
+    /// Set configuration values
+    Set {
+        /// Auto-resume downloads on startup
+        #[arg(long)]
+        auto_resume: Option<bool>,
+
+        /// Default number of threads
+        #[arg(long)]
+        threads: Option<u8>,
+
+        /// buffer size in single threaded download
+        #[arg(long)]
+        single_threaded_buffer_size: u64,
+
+        /// Buffer size (per thread) in multi-threaded download
+        #[arg(long)]
+        multi_threaded_buffer_size: u64,
+
+        /// Default download directory
+        #[arg(long)]
+        download_dir: Option<PathBuf>,
+
+        /// Database path
+        #[arg(long)]
+        database: Option<PathBuf>,
+    },
+}
+
+fn setup_logging(verbosity: u8) {
+    let filter = match verbosity {
+        0 => "error", // Default: only errors
+        1 => "warn",  // -v: warnings too
+        2 => "info",  // -vv: info too
+        _ => "trace", // -vvv: everything
+    };
+
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::new(filter))
+        .init();
+}
+
+fn main() -> Result<()> {
+    color_eyre::install()?;
+    let cli = Cli::parse();
+    setup_logging(cli.debug);
+    info!("CLI parsed");
+    run(cli)?;
+    Ok(())
+}
+
+// Example usage messages (would be shown in --help):
+/*
+USAGE:
+    dm list --incomplete            # Show incomplete downloads
+    dm list --limit 10             # Show 10 most recent downloads
+    dm start <URL> -o path         # Start new download with custom path
+    dm watch                       # Watch all active downloads
+    dm watch 1 2 3                 # Watch specific downloads
+    dm pause                       # Pause all downloads
+    dm resume 1                    # Resume download #1
+    dm remove 1 2 --delete-files   # Remove downloads and their files
+    dm update 1 --url "new-url"    # Update download #1's URL
+    dm config set --threads 4      # Set default thread count
+*/

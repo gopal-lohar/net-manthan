@@ -58,8 +58,8 @@ pub enum IpcMessage {
 pub enum IpcRequest {
     ListDownloads {
         incomplete_only: bool,
-        limit: Option<usize>,
         detailed: bool,
+        limit: Option<usize>,
     },
     StartDownload {
         url: String,
