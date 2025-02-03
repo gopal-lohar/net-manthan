@@ -1,9 +1,7 @@
-use crate::types::ChunkProgress;
-use crate::DownloadProgress;
+use crate::types::PartProgress;
 use chrono::{Duration, Utc};
 use crossbeam_channel::Receiver;
 use std::{
-    collections::HashMap,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -14,25 +12,20 @@ use tokio::sync::broadcast;
 
 // TODO: close this thread when the download is complete
 pub async fn progress_aggregator(
-    download_id: u64,
-    progress_receiver: Receiver<ChunkProgress>,
-    broadcast_sender: broadcast::Sender<DownloadProgress>,
+    mut download_progress: Vec<PartProgress>,
+    progress_receiver: Receiver<PartProgress>,
+    broadcast_sender: broadcast::Sender<Vec<PartProgress>>,
     udpate_interval: Duration,
     cancel_token: Arc<AtomicBool>,
 ) {
-    let mut download_progress: DownloadProgress = DownloadProgress {
-        download_id,
-        chunks: HashMap::<u32, ChunkProgress>::new(),
-    };
 
     let mut last_update = Utc::now();
 
     while !cancel_token.load(Ordering::Relaxed) {
         match progress_receiver.recv_timeout(StdDuration::from_millis(100)) {
-            Ok(chunk_progress) => {
-                download_progress
-                    .chunks
-                    .insert(chunk_progress.chunk_id, chunk_progress);
+            Ok(part_progress) => {
+                let part_id = part_progress.part_id as usize;
+                download_progress[part_id] = part_progress;
             }
             Err(_) => {}
         }

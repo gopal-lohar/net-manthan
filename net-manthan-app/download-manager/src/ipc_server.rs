@@ -59,6 +59,15 @@ async fn handle_ipc_client(mut stream: TcpStream, download_manager: Arc<Mutex<Do
                         Err(_) => return,
                     }
                 }
+                IpcRequest::StartDownload { url, output_path, thread_count } =>{
+                    let download_id = 1;
+                    // download_manager.lock().unwrap().start_download(download_id, request);
+                    let response = IpcResponse::Success;
+                    match send_response_to_client(response, &mut stream).await {
+                        Ok(_) => {}
+                        Err(_) => return,
+                    }
+                }
                 _ => {}
             },
             Err(_) => {

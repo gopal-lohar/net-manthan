@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 
 // Shared message type between client and server
@@ -11,25 +11,38 @@ pub enum Message {
     DownnloadResponse(String),
     InvalidMessage,
     ProgressRequest(Vec<u64>),
-    ProgressResponse(HashMap<u32, ChunkProgress>),
+    ProgressResponse(HashMap<u32, PartProgress>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DownloadRequest {
     pub url: String,
-    pub filename: String,
-    pub mime: Option<String>,
-    pub referrer: Option<String>,
+    pub filepath: PathBuf,
     pub headers: Option<Vec<String>>,
+    pub parts: Option<Vec<DownloadPart>>,
+    pub config: DownloadRequestConfig,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DownloadRequestConfig {
+    pub thread_count: u8,
+    pub buffer_size: usize,
+    pub update_interval: Duration,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DownloadPart {
+    pub part_id: u8,
+    pub bytes_downloaded: u64,
+    pub range: Option<(u64, u64)>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct ChunkProgress {
-    pub download_id: u64,
-    pub chunk_id: u32,
+pub struct PartProgress {
+    pub part_id: u8,
     pub bytes_downloaded: u64,
     pub total_bytes: u64,
-    pub speed: f64,
+    pub speed: u64,
     pub timestamp: DateTime<Utc>,
     pub error: bool,
 }

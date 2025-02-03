@@ -1,32 +1,21 @@
-use crate::{errors::DownloadError, types::ChunkProgress};
-use chrono::{Duration, Utc};
+use crate::{errors::DownloadError, types::{PartProgress, DownloadPart, DownloadRequest}};
+use chrono::Utc;
 use crossbeam_channel::Sender;
 use futures_util::StreamExt;
 use reqwest::{header, Client};
 use std::{
-    fs::{File, OpenOptions},
-    io::{BufWriter, Seek, Write},
-    sync::{
+    fs::{File, OpenOptions}, io::{BufWriter, Seek, Write}, path::PathBuf, sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
-    },
+    }
 };
 
-const BUFFER_SIZE: usize = 1024 * 1024;
-
-pub struct DownloadPart {
-    pub download_id: u64,
-    pub chunk_id: u32,
-    pub url: String,
-    pub filepath: String,
-    pub bytes_downloaded: u64,
-    pub range: Option<(u64, u64)>,
-}
 
 fn open_download_file(
-    filepath: &str,
+    filepath: PathBuf,
     range: Option<(u64, u64)>,
     bytes_downloaded: u64,
+    buffer_size: usize,
 ) -> Result<BufWriter<File>, std::io::Error> {
     let mut file = OpenOptions::new().write(true).open(filepath)?;
     match range {
@@ -35,19 +24,19 @@ fn open_download_file(
         }
         None => {}
     }
-    let file_writer = BufWriter::with_capacity(BUFFER_SIZE, file);
+    let file_writer = BufWriter::with_capacity(buffer_size, file);
     Ok(file_writer)
 }
 
 pub async fn download_part(
+    request: DownloadRequest,
     part: DownloadPart,
-    progress_sender: Sender<ChunkProgress>,
-    udpate_interval: Duration,
+    progress_sender: Sender<PartProgress>,
     cancel_token: Arc<AtomicBool>,
 ) -> Result<(), DownloadError> {
     let mut bytes_downloaded: u64 = part.bytes_downloaded;
 
-    let mut file_writer = match open_download_file(&part.filepath, part.range, bytes_downloaded) {
+    let mut file_writer = match open_download_file(request.filepath, part.range, bytes_downloaded, request.config.buffer_size) {
         Ok(file) => file,
         Err(err) => {
             return Err(DownloadError::FileSystemError(err));
@@ -58,12 +47,12 @@ pub async fn download_part(
     let reqeust = match part.range {
         Some((start, end)) => {
             client
-                .get(&part.url)
+                .get(&request.url)
                 .header(header::RANGE, format!("bytes={}-{}", start, end))
                 .send()
                 .await
         }
-        None => client.get(&part.url).send().await,
+        None => client.get(&request.url).send().await,
     };
 
     let response = match reqeust {
@@ -104,19 +93,18 @@ pub async fn download_part(
                     .map_err(DownloadError::from_write_error)?;
                 bytes_downloaded_last += chunk.len() as u64;
                 let elapsed = Utc::now() - last_update_time;
-                if elapsed >= udpate_interval {
+                if elapsed >= request.config.update_interval {
                     speed_in_bytes =
                         ((bytes_downloaded_last as f64) / elapsed.num_seconds() as f64) as u64;
                     bytes_downloaded += bytes_downloaded_last;
                     bytes_downloaded_last = 0;
                     last_update_time = Utc::now();
 
-                    let progress = ChunkProgress {
-                        download_id: part.download_id,
-                        chunk_id: part.chunk_id,
+                    let progress = PartProgress {
+                        part_id: part.part_id,
                         bytes_downloaded,
                         total_bytes: download_size,
-                        speed: speed_in_bytes as f64,
+                        speed: speed_in_bytes,
                         timestamp: Utc::now(),
                         error: false,
                     };
@@ -139,12 +127,11 @@ pub async fn download_part(
         .map_err(DownloadError::from_write_error)?;
 
     bytes_downloaded += bytes_downloaded_last;
-    let progress = ChunkProgress {
-        download_id: part.download_id,
-        chunk_id: part.chunk_id,
+    let progress = PartProgress {
+        part_id: part.part_id,
         bytes_downloaded,
         total_bytes: download_size,
-        speed: speed_in_bytes as f64,
+        speed: speed_in_bytes,
         timestamp: Utc::now(),
         error: false,
     };
