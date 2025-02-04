@@ -3,8 +3,8 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
 };
 
-use net_manthan_core::types::{DownloadRequest, PartProgress};
 use net_manthan_core::download;
+use net_manthan_core::types::{DownloadRequest, PartProgress};
 use tokio::sync::broadcast;
 
 pub struct DownloadHandle {
@@ -23,11 +23,7 @@ impl DownloadManager {
         }
     }
 
-    pub fn start_download(
-        &mut self,
-        download_id: u64,
-        request: DownloadRequest,
-    ) {
+    pub fn start_download(&mut self, download_id: u64, request: DownloadRequest) {
         let (broadcast_sender, broadcast_receiver) = broadcast::channel(100);
         let cancel_token = Arc::new(AtomicBool::new(false));
 

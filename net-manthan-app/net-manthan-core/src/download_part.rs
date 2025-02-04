@@ -1,15 +1,23 @@
-use crate::{errors::DownloadError, types::{PartProgress, DownloadPart, DownloadRequest}};
+use crate::{
+    errors::DownloadError,
+    types::{DownloadPart, DownloadRequest, PartProgress},
+};
 use chrono::Utc;
 use crossbeam_channel::Sender;
 use futures_util::StreamExt;
-use reqwest::{header, Client};
+use reqwest::{
+    header::{self, HeaderMap, HeaderName, HeaderValue},
+    Client,
+};
 use std::{
-    fs::{File, OpenOptions}, io::{BufWriter, Seek, Write}, path::PathBuf, sync::{
+    fs::{File, OpenOptions},
+    io::{BufWriter, Seek, Write},
+    path::PathBuf,
+    sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
-    }
+    },
 };
-
 
 fn open_download_file(
     filepath: PathBuf,
@@ -36,7 +44,12 @@ pub async fn download_part(
 ) -> Result<(), DownloadError> {
     let mut bytes_downloaded: u64 = part.bytes_downloaded;
 
-    let mut file_writer = match open_download_file(request.filepath, part.range, bytes_downloaded, request.config.buffer_size) {
+    let mut file_writer = match open_download_file(
+        request.filepath,
+        part.range,
+        bytes_downloaded,
+        request.config.buffer_size,
+    ) {
         Ok(file) => file,
         Err(err) => {
             return Err(DownloadError::FileSystemError(err));
@@ -44,18 +57,34 @@ pub async fn download_part(
     };
 
     let client = Client::new();
-    let reqeust = match part.range {
+
+    let mut req = client.get(&request.url);
+
+    if let Some(headers) = &request.headers {
+        let mut header_map = HeaderMap::new();
+        for header in headers {
+            if let Some((name, value)) = header.split_once(": ") {
+                if let (Ok(name), Ok(value)) = (
+                    HeaderName::from_bytes(name.as_bytes()),
+                    HeaderValue::from_str(value),
+                ) {
+                    header_map.insert(name, value);
+                }
+            }
+        }
+        req = req.headers(header_map);
+    }
+
+    let sent_request = match part.range {
         Some((start, end)) => {
-            client
-                .get(&request.url)
-                .header(header::RANGE, format!("bytes={}-{}", start, end))
+            req.header(header::RANGE, format!("bytes={}-{}", start, end))
                 .send()
                 .await
         }
-        None => client.get(&request.url).send().await,
+        None => req.send().await,
     };
 
-    let response = match reqeust {
+    let response = match sent_request {
         Ok(response) => {
             if !response.status().is_success() {
                 return Err(DownloadError::GeneralError(format!(

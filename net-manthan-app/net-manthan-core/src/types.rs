@@ -71,6 +71,7 @@ pub enum IpcRequest {
         url: String,
         output_path: Option<PathBuf>,
         thread_count: Option<u8>,
+        headers: Option<Vec<String>>,
     },
     ResumeDownloads {
         ids: Vec<u64>, // Empty means all

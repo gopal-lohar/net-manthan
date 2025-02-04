@@ -11,7 +11,6 @@ struct ResponseToExtension {
     payload: String,
 }
 
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DownloadRequest {
     pub url: String,
@@ -20,8 +19,6 @@ pub struct DownloadRequest {
     pub referrer: Option<String>,
     pub headers: Option<Vec<String>>,
 }
-
-
 
 fn main() {
     event_loop(|value| match value {
@@ -35,28 +32,29 @@ fn main() {
                     });
                 }
             };
-            let download_request: DownloadRequest = match serde_json::from_value(Value::Object(request)) {
-                Ok(request) => request,
-                Err(err) => {
-                    return Ok(ResponseToExtension {
-                        payload: format!("Invalid request, {}", err),
-                    });
-                }
-            };
+            let download_request: DownloadRequest =
+                match serde_json::from_value(Value::Object(request)) {
+                    Ok(request) => request,
+                    Err(err) => {
+                        return Ok(ResponseToExtension {
+                            payload: format!("Invalid request, {}", err),
+                        });
+                    }
+                };
 
-
-            let message = IpcRequest::StartDownload{
+            let message = IpcRequest::StartDownload {
                 url: download_request.url,
                 output_path: Some(PathBuf::from(download_request.filename)),
                 thread_count: None,
+                headers: download_request.headers,
             };
 
             match client.send_and_receive(message) {
                 Ok(response) => {
                     return match response {
-                        IpcResponse::Success => {
-                            Ok(ResponseToExtension { payload: "Download Started".to_string() })
-                        }
+                        IpcResponse::Success => Ok(ResponseToExtension {
+                            payload: "Download Started".to_string(),
+                        }),
                         _ => Ok(ResponseToExtension {
                             payload: "Something went wrong".to_string(),
                         }),

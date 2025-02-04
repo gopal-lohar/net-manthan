@@ -36,7 +36,11 @@ impl Client {
         bincode::deserialize(&buffer).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
 
-    pub fn send_and_stream<F>(&mut self, message: IpcRequest, mut callback: F) -> std::io::Result<()>
+    pub fn send_and_stream<F>(
+        &mut self,
+        message: IpcRequest,
+        mut callback: F,
+    ) -> std::io::Result<()>
     where
         F: FnMut(IpcResponse),
     {

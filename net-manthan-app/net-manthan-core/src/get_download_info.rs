@@ -1,10 +1,10 @@
-use crate::types::DownloadRequest;
 use crate::errors::DownloadError;
+use crate::types::DownloadRequest;
 use reqwest::{header, Client};
 
 pub struct DownloadInfo {
-  pub   size: u64,
-  pub   resume: bool,
+    pub size: u64,
+    pub resume: bool,
 }
 
 pub async fn get_download_info(request: &DownloadRequest) -> Result<DownloadInfo, DownloadError> {

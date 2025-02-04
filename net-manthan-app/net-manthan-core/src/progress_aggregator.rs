@@ -18,7 +18,6 @@ pub async fn progress_aggregator(
     udpate_interval: Duration,
     cancel_token: Arc<AtomicBool>,
 ) {
-
     let mut last_update = Utc::now();
 
     while !cancel_token.load(Ordering::Relaxed) {

@@ -1,18 +1,18 @@
-use crate::types::PartProgress;
 use crate::types::DownloadRequest;
+use crate::types::PartProgress;
 use crossbeam_channel::bounded;
 use download_part::download_part;
 use errors::DownloadError;
 use get_download_info::get_download_info;
 use get_download_info::DownloadInfo;
 use progress_aggregator::progress_aggregator;
-use types::DownloadPart;
 use std::path::PathBuf;
 use std::{
     fs::OpenOptions,
     sync::{atomic::AtomicBool, Arc},
 };
 use tokio::sync::broadcast;
+use types::DownloadPart;
 
 pub mod download_part;
 pub mod errors;
@@ -50,7 +50,6 @@ fn get_download_parts(thread_count: u8, download_info: DownloadInfo) -> Vec<Down
     parts
 }
 
-
 pub async fn download(
     mut request: DownloadRequest,
     cancel_token: Arc<AtomicBool>,
@@ -60,8 +59,6 @@ pub async fn download(
     let (aggregator_sender, aggregator_receiver) = bounded::<PartProgress>(100);
     let download_info = get_download_info(&request).await?;
     create_download_file(&request.filepath, download_info.size)?;
-
-    
 
     let parts = match request.parts {
         Some(parts) => parts,
@@ -77,7 +74,7 @@ pub async fn download(
                 total_bytes: part.range.map(|(start, end)| end - start + 1).unwrap_or(0),
                 speed: 0,
                 timestamp: chrono::Utc::now(),
-                error: false
+                error: false,
             })
             .collect::<Vec<PartProgress>>();
         let cancel_token = cancel_token.clone();
