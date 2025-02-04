@@ -2,9 +2,11 @@ use std::sync::{Arc, Mutex};
 
 use crate::constants::IPC_SOCKET_ADDRESS;
 use crate::download_manager::DownloadManager;
-use net_manthan_core::types::{IpcRequest, IpcResponse};
+use chrono::Duration;
+use net_manthan_core::types::{ DownloadRequest, DownloadRequestConfig, IpcRequest, IpcResponse};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
+use tracing::info;
 
 async fn read_message_to_buffer(
     mut buffer: &mut Vec<u8>,
@@ -44,10 +46,11 @@ async fn handle_ipc_client(mut stream: TcpStream, download_manager: Arc<Mutex<Do
     let mut buffer = Vec::new();
     loop {
         if read_message_to_buffer(&mut buffer, &mut stream)
-            .await
-            .is_err()
+        .await.is_err()
         {
             return;
+        }else{
+            println!("Message read successfully");
         }
 
         match bincode::deserialize::<IpcRequest>(&buffer) {
@@ -60,8 +63,20 @@ async fn handle_ipc_client(mut stream: TcpStream, download_manager: Arc<Mutex<Do
                     }
                 }
                 IpcRequest::StartDownload { url, output_path, thread_count } =>{
+                    info!("Received request");
                     let download_id = 1;
-                    // download_manager.lock().unwrap().start_download(download_id, request);
+                    download_manager.lock().unwrap().start_download(download_id, DownloadRequest{
+                        url,
+                        filepath: output_path.unwrap_or("/tmp/test".into()),
+                        headers: None,
+                        parts: None,
+                        config: DownloadRequestConfig{
+                            thread_count: thread_count.unwrap_or(5),
+                            buffer_size: 1024 * 1024,
+                            update_interval: Duration::seconds(1),
+                        },
+                    });
+                    println!("Download started");
                     let response = IpcResponse::Success;
                     match send_response_to_client(response, &mut stream).await {
                         Ok(_) => {}
@@ -88,7 +103,6 @@ pub async fn start_ipc_server(download_manager: Arc<Mutex<DownloadManager>>) {
             return;
         }
     };
-
     loop {
         match listener.accept().await {
             Ok((stream, _)) => {

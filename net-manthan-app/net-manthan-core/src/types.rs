@@ -101,7 +101,7 @@ pub enum IpcResponse {
     HeartBeat,
     Success,
     Error(String),
-
+    DownloadProgress(DownloadProgress),
     DownloadsList(Vec<DownloadInfo>),
 }
 
@@ -136,7 +136,7 @@ pub struct DownloadProgress {
     pub status: DownloadStatus,
     pub downloaded_size: u64,
     pub total_size: Option<u64>,
-    pub speed: f64,
+    pub speed: u64,
     pub threads_info: Option<Vec<ThreadProgress>>,
 }
 

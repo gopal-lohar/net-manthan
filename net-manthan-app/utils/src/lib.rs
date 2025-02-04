@@ -1,5 +1,5 @@
 use bincode;
-use net_manthan_core::types::Message;
+use net_manthan_core::types::{IpcRequest, IpcResponse};
 use std::io::prelude::*;
 use std::net::TcpStream;
 
@@ -15,7 +15,7 @@ impl Client {
         Ok(Client { stream })
     }
 
-    pub fn send_and_receive(&mut self, message: Message) -> std::io::Result<Message> {
+    pub fn send_and_receive(&mut self, message: IpcRequest) -> std::io::Result<IpcResponse> {
         let serialized = bincode::serialize(&message)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
@@ -36,9 +36,9 @@ impl Client {
         bincode::deserialize(&buffer).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
 
-    pub fn send_and_stream<F>(&mut self, message: Message, mut callback: F) -> std::io::Result<()>
+    pub fn send_and_stream<F>(&mut self, message: IpcRequest, mut callback: F) -> std::io::Result<()>
     where
-        F: FnMut(Message),
+        F: FnMut(IpcResponse),
     {
         let serialized = bincode::serialize(&message)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
@@ -59,7 +59,7 @@ impl Client {
                     let mut buffer = vec![0u8; msg_len];
                     self.stream.read_exact(&mut buffer)?;
 
-                    let response: Message = bincode::deserialize(&buffer)
+                    let response: IpcResponse = bincode::deserialize(&buffer)
                         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
                     // Call the provided callback function with the received message
