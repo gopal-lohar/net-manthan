@@ -1,0 +1,37 @@
+html,
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+button {
+  background-color: hsl(var(--secondary));
+  padding: var(--p-1) var(--p-4);
+  border-radius: 0.25rem;
+  border-width: 2px;
+  border-color: transparent;
+}
+
+button:hover,
+button:focus-visible {
+  background-color: hsl(var(--secondary) / 0.5);
+}
+
+button:focus-visible {
+  outline: none;
+  border-color: hsl(var(--ring));
+}
+
+input {
+  padding: var(--p-2) var(--p-4);
+  outline: none;
+  border: 2px solid hsl(var(--border));
+}
+
+input:focus-visible {
+  border-color: hsl(var(--ring));
+}
+
+.download-action-button-wrapper {
+  padding-block: var(--p-2);
+}
