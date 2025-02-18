@@ -1,18 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-
-// Shared message type between client and server
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum Message {
-    HeartBeat,
-    DownloadRequest(DownloadRequest),
-    DownnloadResponse(String),
-    InvalidMessage,
-    ProgressRequest(Vec<u64>),
-    ProgressResponse(HashMap<u32, PartProgress>),
-}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DownloadRequest {
