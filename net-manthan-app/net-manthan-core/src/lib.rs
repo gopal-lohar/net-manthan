@@ -14,6 +14,7 @@ use std::{
 use tokio::sync::broadcast;
 use types::DownloadPart;
 
+pub mod config;
 pub mod download_part;
 pub mod errors;
 pub mod get_download_info;

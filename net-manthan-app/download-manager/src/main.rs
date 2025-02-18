@@ -1,10 +1,11 @@
 use std::{
-    path::Path,
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
 use download_db_manager::connect_to_database;
 use download_manager::DownloadManager;
+use net_manthan_core::config::NetManthanConfig;
 
 pub mod constants;
 pub mod download_db_manager;
@@ -13,8 +14,12 @@ mod ipc_server;
 
 #[tokio::main]
 async fn main() {
-    let db_path = Path::new("./.dev/downloads.db");
-    let mut db_manager = match connect_to_database(db_path) {
+    let config = match NetManthanConfig::load_config(PathBuf::from("./.dev/config.toml")) {
+        Ok(config) => config,
+        Err(e) => NetManthanConfig::get_default_config(),
+    };
+
+    let mut db_manager = match connect_to_database(&config.database_path) {
         Ok(db_manager) => db_manager,
         Err(e) => {
             eprintln!("Failed to connect to database: {}", e);
@@ -30,6 +35,6 @@ async fn main() {
         }
     };
 
-    let download_manager = Arc::new(Mutex::new(DownloadManager::new(all_downloads)));
+    let download_manager = Arc::new(Mutex::new(DownloadManager::new(all_downloads, config)));
     ipc_server::start_ipc_server(download_manager).await;
 }

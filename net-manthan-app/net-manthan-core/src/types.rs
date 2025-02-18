@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use crate::config::NetManthanConfig;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -34,17 +35,6 @@ pub struct PartProgress {
     pub speed: u64,
     pub timestamp: DateTime<Utc>,
     pub error: bool,
-}
-
-// ----------------- Config -----------------
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct NetManthanConfig {
-    pub auto_resume: bool,
-    pub default_threads: u8,
-    pub single_threaded_buffer_size: u64,
-    pub multi_threaded_buffer_size: u64,
-    pub download_dir: PathBuf,
-    pub database_path: PathBuf,
 }
 
 // ----------------- IPC MESSAGES -----------------

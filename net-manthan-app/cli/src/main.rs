@@ -123,11 +123,11 @@ pub enum ConfigCommands {
 
         /// buffer size in single threaded download
         #[arg(long)]
-        single_threaded_buffer_size: u64,
+        single_threaded_buffer_size_in_kb: u64,
 
         /// Buffer size (per thread) in multi-threaded download
         #[arg(long)]
-        multi_threaded_buffer_size: u64,
+        multi_threaded_buffer_size_in_kb: u64,
 
         /// Default download directory
         #[arg(long)]

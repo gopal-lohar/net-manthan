@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Row};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 /// Represents a download in the database
@@ -34,7 +34,7 @@ pub struct DownloadPart {
 }
 
 // connecting to the database
-pub fn connect_to_database(db_path: &Path) -> Result<DatabaseManager> {
+pub fn connect_to_database(db_path: &PathBuf) -> Result<DatabaseManager> {
     if let Some(parent) = db_path.parent() {
         std::fs::create_dir_all(parent)
             .context("download file doesn't exist and cannot be created")?;

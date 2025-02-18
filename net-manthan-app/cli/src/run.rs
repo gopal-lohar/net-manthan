@@ -54,8 +54,8 @@ pub fn run(cli: Cli) -> Result<()> {
             crate::ConfigCommands::Set {
                 auto_resume,
                 threads,
-                single_threaded_buffer_size,
-                multi_threaded_buffer_size,
+                single_threaded_buffer_size_in_kb,
+                multi_threaded_buffer_size_in_kb,
                 download_dir,
                 database,
             } => {
@@ -64,11 +64,11 @@ pub fn run(cli: Cli) -> Result<()> {
                 info!("Threads: {:?}", threads);
                 info!(
                     "Single threaded buffer size: {:?}",
-                    single_threaded_buffer_size
+                    single_threaded_buffer_size_in_kb
                 );
                 info!(
                     "Multi threaded buffer size: {:?}",
-                    multi_threaded_buffer_size
+                    multi_threaded_buffer_size_in_kb
                 );
                 info!("Download dir: {:?}", download_dir);
                 info!("Database: {:?}", database);

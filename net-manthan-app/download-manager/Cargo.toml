@@ -15,7 +15,8 @@ rusqlite.workspace = true
 anyhow.workspace = true
 bincode.workspace = true
 chrono.workspace = true
-uuid = { version = "1.14.0", features = ["v4", "serde"] }
+uuid.workspace = true
+toml.workspace = true
 
 [dev-dependencies]
 tempfile = "3.3"

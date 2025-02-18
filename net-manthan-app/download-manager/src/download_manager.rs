@@ -1,16 +1,13 @@
-use std::{
-    collections::HashMap,
-    sync::{atomic::AtomicBool, Arc, Mutex},
-};
+use std::sync::{atomic::AtomicBool, Arc};
 
 use crate::download_db_manager::Download;
-use net_manthan_core::download;
 use net_manthan_core::types::{DownloadRequest, PartProgress};
 use net_manthan_core::types::{IpcRequest, IpcResponse};
+use net_manthan_core::{config::NetManthanConfig, download};
 use tokio::sync::broadcast;
 
 pub struct DownloadManager {
-    pub active_downloads: HashMap<u64, DownloadHandle>,
+    pub config: NetManthanConfig,
     pub all_downloads: Vec<Download>,
 }
 
@@ -20,9 +17,9 @@ pub struct DownloadHandle {
 }
 
 impl DownloadManager {
-    pub fn new(all_downloads: Vec<Download>) -> Self {
+    pub fn new(all_downloads: Vec<Download>, config: NetManthanConfig) -> Self {
         Self {
-            active_downloads: HashMap::new(),
+            config,
             all_downloads,
         }
     }
@@ -71,7 +68,5 @@ impl DownloadManager {
             handle.cancel_token.clone(),
             broadcast_sender,
         ));
-
-        self.active_downloads.insert(download_id, handle);
     }
 }
