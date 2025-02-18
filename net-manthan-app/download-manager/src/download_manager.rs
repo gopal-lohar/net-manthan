@@ -1,25 +1,59 @@
 use std::{
     collections::HashMap,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{atomic::AtomicBool, Arc, Mutex},
 };
 
+use crate::download_db_manager::Download;
 use net_manthan_core::download;
 use net_manthan_core::types::{DownloadRequest, PartProgress};
+use net_manthan_core::types::{IpcRequest, IpcResponse};
 use tokio::sync::broadcast;
+
+pub struct DownloadManager {
+    pub active_downloads: HashMap<u64, DownloadHandle>,
+    pub all_downloads: Vec<Download>,
+}
 
 pub struct DownloadHandle {
     pub cancel_token: Arc<AtomicBool>,
     pub progress_receiver: broadcast::Receiver<Vec<PartProgress>>,
 }
 
-pub struct DownloadManager {
-    pub active_downloads: HashMap<u64, DownloadHandle>,
-}
-
 impl DownloadManager {
-    pub fn new() -> Self {
+    pub fn new(all_downloads: Vec<Download>) -> Self {
         Self {
             active_downloads: HashMap::new(),
+            all_downloads,
+        }
+    }
+
+    pub fn handle_ipc_request(&mut self, request: IpcRequest) -> IpcResponse {
+        match request {
+            IpcRequest::HeartBeat => IpcResponse::HeartBeat,
+            IpcRequest::StartDownload {
+                url,
+                output_path,
+                thread_count,
+                headers,
+            } => {
+                // download_manager.lock().unwrap().start_download(
+                //     download_id,
+                //     DownloadRequest {
+                //         url,
+                //         filepath: output_path.unwrap_or("/tmp/test".into()),
+                //         headers,
+                //         parts: None,
+                //         config: DownloadRequestConfig {
+                //             thread_count: thread_count.unwrap_or(5),
+                //             buffer_size: 1024 * 1024,
+                //             update_interval: Duration::seconds(1),
+                //         },
+                //     },
+                // );
+                println!("Download started");
+                IpcResponse::Success
+            }
+            _ => IpcResponse::Error("Invalid request".into()),
         }
     }
 

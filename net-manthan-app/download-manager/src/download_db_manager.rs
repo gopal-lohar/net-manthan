@@ -33,6 +33,19 @@ pub struct DownloadPart {
     pub bytes_downloaded: u64,
 }
 
+// connecting to the database
+pub fn connect_to_database(db_path: &Path) -> Result<DatabaseManager> {
+    if let Some(parent) = db_path.parent() {
+        std::fs::create_dir_all(parent)
+            .context("download file doesn't exist and cannot be created")?;
+    }
+
+    match DatabaseManager::new(db_path) {
+        Ok(db_manager) => Ok(db_manager),
+        Err(e) => Err(e),
+    }
+}
+
 /// Manages database operations for the download manager
 pub struct DatabaseManager {
     conn: Connection,

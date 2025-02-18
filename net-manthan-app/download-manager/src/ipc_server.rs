@@ -2,11 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use crate::constants::IPC_SOCKET_ADDRESS;
 use crate::download_manager::DownloadManager;
-use chrono::Duration;
-use net_manthan_core::types::{DownloadRequest, DownloadRequestConfig, IpcRequest, IpcResponse};
+use net_manthan_core::types::{IpcRequest, IpcResponse};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tracing::info;
 
 async fn read_message_to_buffer(
     mut buffer: &mut Vec<u8>,
@@ -54,53 +52,17 @@ async fn handle_ipc_client(mut stream: TcpStream, download_manager: Arc<Mutex<Do
             println!("Message read successfully");
         }
 
-        match bincode::deserialize::<IpcRequest>(&buffer) {
-            Ok(request) => match request {
-                IpcRequest::HeartBeat => {
-                    let response = IpcResponse::HeartBeat;
-                    match send_response_to_client(response, &mut stream).await {
-                        Ok(_) => {}
-                        Err(_) => return,
-                    }
-                }
-                IpcRequest::StartDownload {
-                    url,
-                    output_path,
-                    thread_count,
-                    headers,
-                } => {
-                    info!("Received request");
-                    let download_id = 1;
-                    download_manager.lock().unwrap().start_download(
-                        download_id,
-                        DownloadRequest {
-                            url,
-                            filepath: output_path.unwrap_or("/tmp/test".into()),
-                            headers,
-                            parts: None,
-                            config: DownloadRequestConfig {
-                                thread_count: thread_count.unwrap_or(5),
-                                buffer_size: 1024 * 1024,
-                                update_interval: Duration::seconds(1),
-                            },
-                        },
-                    );
-                    println!("Download started");
-                    let response = IpcResponse::Success;
-                    match send_response_to_client(response, &mut stream).await {
-                        Ok(_) => {}
-                        Err(_) => return,
-                    }
-                }
-                _ => {}
+        let response = match bincode::deserialize::<IpcRequest>(&buffer) {
+            Ok(request) => match download_manager.lock() {
+                Ok(mut download_manager) => download_manager.handle_ipc_request(request),
+                Err(_) => IpcResponse::Error("Failed to acquire lock".to_string()),
             },
-            Err(_) => {
-                let response = IpcResponse::Error("Invalid Message".to_string());
-                match send_response_to_client(response, &mut stream).await {
-                    Ok(_) => {}
-                    Err(_) => return,
-                }
-            }
+            Err(_) => IpcResponse::Error("Invalid Message".to_string()),
+        };
+
+        match send_response_to_client(response, &mut stream).await {
+            Ok(_) => {}
+            Err(_) => return,
         }
     }
 }
