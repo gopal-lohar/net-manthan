@@ -1,6 +1,6 @@
 use crate::types::PartProgress;
 use chrono::{Duration, Utc};
-use crossbeam_channel::Receiver;
+use crossbeam_channel::{Receiver, Sender};
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -8,13 +8,12 @@ use std::{
     },
     time::Duration as StdDuration,
 };
-use tokio::sync::broadcast;
 
 // TODO: close this thread when the download is complete
 pub async fn progress_aggregator(
     mut download_progress: Vec<PartProgress>,
     progress_receiver: Receiver<PartProgress>,
-    broadcast_sender: broadcast::Sender<Vec<PartProgress>>,
+    progress_sender: Sender<Vec<PartProgress>>,
     udpate_interval: Duration,
     cancel_token: Arc<AtomicBool>,
 ) {
@@ -31,7 +30,7 @@ pub async fn progress_aggregator(
 
         if (Utc::now() - last_update).num_milliseconds() > udpate_interval.num_milliseconds() as i64
         {
-            if broadcast_sender.send(download_progress.clone()).is_err() {
+            if progress_sender.send(download_progress.clone()).is_err() {
                 break;
             }
             last_update = Utc::now();

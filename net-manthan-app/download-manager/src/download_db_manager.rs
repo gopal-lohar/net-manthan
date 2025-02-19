@@ -609,7 +609,6 @@ pub struct DownloadStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
     use tempfile::tempdir;
 
     fn create_test_download() -> Download {

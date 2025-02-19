@@ -1,10 +1,10 @@
 use std::sync::{atomic::AtomicBool, Arc};
 
 use crate::download_db_manager::Download;
+use crossbeam_channel::bounded;
 use net_manthan_core::types::{DownloadRequest, PartProgress};
 use net_manthan_core::types::{IpcRequest, IpcResponse};
 use net_manthan_core::{config::NetManthanConfig, download};
-use tokio::sync::broadcast;
 
 pub struct DownloadManager {
     pub config: NetManthanConfig,
@@ -13,7 +13,7 @@ pub struct DownloadManager {
 
 pub struct DownloadHandle {
     pub cancel_token: Arc<AtomicBool>,
-    pub progress_receiver: broadcast::Receiver<Vec<PartProgress>>,
+    pub progress_receiver: crossbeam_channel::Receiver<Vec<PartProgress>>,
 }
 
 impl DownloadManager {
@@ -55,18 +55,19 @@ impl DownloadManager {
     }
 
     pub fn start_download(&mut self, download_id: u64, request: DownloadRequest) {
-        let (broadcast_sender, broadcast_receiver) = broadcast::channel(100);
         let cancel_token = Arc::new(AtomicBool::new(false));
+
+        let (progress_sender, progress_receiver) = bounded::<Vec<PartProgress>>(20);
 
         let handle = DownloadHandle {
             cancel_token,
-            progress_receiver: broadcast_receiver.resubscribe(),
+            progress_receiver,
         };
 
         tokio::spawn(download(
             request,
             handle.cancel_token.clone(),
-            broadcast_sender,
+            progress_sender,
         ));
     }
 }

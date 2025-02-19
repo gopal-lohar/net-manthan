@@ -358,6 +358,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "chrono",
+ "crossbeam-channel",
  "net-manthan-core",
  "rusqlite",
  "serde",

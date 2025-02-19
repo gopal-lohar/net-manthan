@@ -1,6 +1,7 @@
 use crate::types::DownloadRequest;
 use crate::types::PartProgress;
 use crossbeam_channel::bounded;
+use crossbeam_channel::Sender;
 use download_part::download_part;
 use errors::DownloadError;
 use get_download_info::get_download_info;
@@ -11,7 +12,6 @@ use std::{
     fs::OpenOptions,
     sync::{atomic::AtomicBool, Arc},
 };
-use tokio::sync::broadcast;
 use types::DownloadPart;
 
 pub mod config;
@@ -54,7 +54,7 @@ fn get_download_parts(thread_count: u8, download_info: DownloadInfo) -> Vec<Down
 pub async fn download(
     mut request: DownloadRequest,
     cancel_token: Arc<AtomicBool>,
-    broadcast_sender: broadcast::Sender<Vec<PartProgress>>,
+    progress_sender: Sender<Vec<PartProgress>>,
 ) -> Result<(), DownloadError> {
     let mut download_handles = Vec::new();
     let (aggregator_sender, aggregator_receiver) = bounded::<PartProgress>(100);
@@ -83,7 +83,7 @@ pub async fn download(
         tokio::spawn(progress_aggregator(
             initial_progress,
             progress_receiver,
-            broadcast_sender,
+            progress_sender,
             request.config.update_interval,
             cancel_token,
         ));
