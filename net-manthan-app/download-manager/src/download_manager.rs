@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::{atomic::AtomicBool, Arc};
 
 use crate::download_db_manager::Download;
@@ -9,6 +10,7 @@ use net_manthan_core::{config::NetManthanConfig, download};
 pub struct DownloadManager {
     pub config: NetManthanConfig,
     pub all_downloads: Vec<Download>,
+    pub active_downloads: HashMap<String, DownloadHandle>,
 }
 
 pub struct DownloadHandle {
@@ -21,6 +23,7 @@ impl DownloadManager {
         Self {
             config,
             all_downloads,
+            active_downloads: HashMap::new(),
         }
     }
 
@@ -54,7 +57,7 @@ impl DownloadManager {
         }
     }
 
-    pub fn start_download(&mut self, download_id: u64, request: DownloadRequest) {
+    pub fn start_download(&mut self, request: DownloadRequest) {
         let cancel_token = Arc::new(AtomicBool::new(false));
 
         let (progress_sender, progress_receiver) = bounded::<Vec<PartProgress>>(20);
@@ -63,6 +66,8 @@ impl DownloadManager {
             cancel_token,
             progress_receiver,
         };
+
+        // self.active_downloads.insert(k, v)
 
         tokio::spawn(download(
             request,

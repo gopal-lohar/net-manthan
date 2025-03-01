@@ -6,11 +6,13 @@ use std::{
 use download_db_manager::connect_to_database;
 use download_manager::DownloadManager;
 use net_manthan_core::config::NetManthanConfig;
+use progress_manager::progress_manager;
 
 pub mod constants;
 pub mod download_db_manager;
 mod download_manager;
 mod ipc_server;
+mod progress_manager;
 
 #[tokio::main]
 async fn main() {
@@ -36,5 +38,8 @@ async fn main() {
     };
 
     let download_manager = Arc::new(Mutex::new(DownloadManager::new(all_downloads, config)));
+
+    tokio::spawn(progress_manager(db_manager, download_manager.clone()));
+
     ipc_server::start_ipc_server(download_manager).await;
 }

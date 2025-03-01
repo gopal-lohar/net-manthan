@@ -19,6 +19,8 @@ pub struct Download {
     pub date_added: DateTime<Utc>,
     pub date_finished: Option<DateTime<Utc>>,
     pub active_time: i64, // Stored as seconds
+    pub paused: bool,     // New field: indicates if the download is currently paused
+    pub error: bool,      // New field: indicates if the download has encountered an error
     pub parts: Vec<DownloadPart>,
 }
 
@@ -78,7 +80,9 @@ impl DatabaseManager {
                 average_speed INTEGER NOT NULL,
                 date_added TEXT NOT NULL,
                 date_finished TEXT,
-                active_time INTEGER NOT NULL
+                active_time INTEGER NOT NULL,
+                paused BOOLEAN NOT NULL DEFAULT 0,
+                error BOOLEAN NOT NULL DEFAULT 0
             )",
                 [],
             )
@@ -126,8 +130,9 @@ impl DatabaseManager {
         tx.execute(
             "INSERT INTO downloads (
                 download_id, filename, path, referrer, download_link, resumable,
-                total_size, size_downloaded, average_speed, date_added, date_finished, active_time
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                total_size, size_downloaded, average_speed, date_added, date_finished, active_time,
+                paused, error
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             params![
                 download.download_id,
                 download.filename,
@@ -140,7 +145,9 @@ impl DatabaseManager {
                 download.average_speed,
                 download.date_added.to_rfc3339(),
                 download.date_finished.map(|dt| dt.to_rfc3339()),
-                download.active_time
+                download.active_time,
+                download.paused,
+                download.error
             ],
         )
         .context("Failed to insert download")?;
@@ -180,7 +187,8 @@ impl DatabaseManager {
             .query_row(
                 "SELECT
                 download_id, filename, path, referrer, download_link, resumable,
-                total_size, size_downloaded, average_speed, date_added, date_finished, active_time
+                total_size, size_downloaded, average_speed, date_added, date_finished, active_time,
+                paused, error
              FROM downloads WHERE download_id = ?1",
                 [download_id],
                 |row| self.row_to_download(row),
@@ -203,7 +211,8 @@ impl DatabaseManager {
             .prepare(
                 "SELECT
                 download_id, filename, path, referrer, download_link, resumable,
-                total_size, size_downloaded, average_speed, date_added, date_finished, active_time
+                total_size, size_downloaded, average_speed, date_added, date_finished, active_time,
+                paused, error
              FROM downloads",
             )
             .context("Failed to prepare statement")?;
@@ -274,7 +283,9 @@ impl DatabaseManager {
                 average_speed = ?9,
                 date_added = ?10,
                 date_finished = ?11,
-                active_time = ?12
+                active_time = ?12,
+                paused = ?13,
+                error = ?14
              WHERE download_id = ?1",
             params![
                 download.download_id,
@@ -288,7 +299,9 @@ impl DatabaseManager {
                 download.average_speed,
                 download.date_added.to_rfc3339(),
                 download.date_finished.map(|dt| dt.to_rfc3339()),
-                download.active_time
+                download.active_time,
+                download.paused,
+                download.error
             ],
         )
         .context("Failed to update download")?;
@@ -435,6 +448,8 @@ impl DatabaseManager {
             date_added,
             date_finished,
             active_time: row.get(11)?,
+            paused: row.get(12)?,
+            error: row.get(13)?,
             parts: Vec::new(), // Parts will be loaded separately
         })
     }
@@ -446,7 +461,8 @@ impl DatabaseManager {
             .prepare(
                 "SELECT
                 download_id, filename, path, referrer, download_link, resumable,
-                total_size, size_downloaded, average_speed, date_added, date_finished, active_time
+                total_size, size_downloaded, average_speed, date_added, date_finished, active_time,
+                paused, error
              FROM downloads WHERE size_downloaded < total_size AND date_finished IS NULL",
             )
             .context("Failed to prepare statement")?;
@@ -476,7 +492,8 @@ impl DatabaseManager {
             .prepare(
                 "SELECT
                 download_id, filename, path, referrer, download_link, resumable,
-                total_size, size_downloaded, average_speed, date_added, date_finished, active_time
+                total_size, size_downloaded, average_speed, date_added, date_finished, active_time,
+                paused, error
              FROM downloads
              WHERE date_finished IS NOT NULL
                AND date_finished BETWEEN ?1 AND ?2",
@@ -535,7 +552,9 @@ impl DatabaseManager {
             .execute(
                 "UPDATE downloads SET
                 date_finished = ?2,
-                size_downloaded = total_size
+                size_downloaded = total_size,
+                paused = 0,
+                error = 0
              WHERE download_id = ?1",
                 params![download_id, now.to_rfc3339()],
             )
@@ -554,6 +573,84 @@ impl DatabaseManager {
             .context("Failed to update active time")?;
 
         Ok(())
+    }
+
+    /// Updates the paused status of a download
+    pub fn set_download_paused(&self, download_id: &str, paused: bool) -> Result<()> {
+        self.conn
+            .execute(
+                "UPDATE downloads SET paused = ?2 WHERE download_id = ?1",
+                params![download_id, paused],
+            )
+            .context("Failed to update pause status")?;
+
+        Ok(())
+    }
+
+    /// Updates the error status of a download
+    pub fn set_download_error(&self, download_id: &str, error: bool) -> Result<()> {
+        self.conn
+            .execute(
+                "UPDATE downloads SET error = ?2 WHERE download_id = ?1",
+                params![download_id, error],
+            )
+            .context("Failed to update error status")?;
+
+        Ok(())
+    }
+
+    /// Gets paused downloads
+    pub fn get_paused_downloads(&self) -> Result<Vec<Download>> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT
+                download_id, filename, path, referrer, download_link, resumable,
+                total_size, size_downloaded, average_speed, date_added, date_finished, active_time,
+                paused, error
+             FROM downloads WHERE paused = 1",
+            )
+            .context("Failed to prepare statement")?;
+
+        let download_iter = stmt
+            .query_map([], |row| self.row_to_download(row))
+            .context("Failed to query paused downloads")?;
+
+        let mut downloads = Vec::new();
+        for download_result in download_iter {
+            let mut download = download_result.context("Failed to read download")?;
+            download.parts = self.get_download_parts(&download.download_id)?;
+            downloads.push(download);
+        }
+
+        Ok(downloads)
+    }
+
+    /// Gets downloads with errors
+    pub fn get_error_downloads(&self) -> Result<Vec<Download>> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT
+                download_id, filename, path, referrer, download_link, resumable,
+                total_size, size_downloaded, average_speed, date_added, date_finished, active_time,
+                paused, error
+             FROM downloads WHERE error = 1",
+            )
+            .context("Failed to prepare statement")?;
+
+        let download_iter = stmt
+            .query_map([], |row| self.row_to_download(row))
+            .context("Failed to query error downloads")?;
+
+        let mut downloads = Vec::new();
+        for download_result in download_iter {
+            let mut download = download_result.context("Failed to read download")?;
+            download.parts = self.get_download_parts(&download.download_id)?;
+            downloads.push(download);
+        }
+
+        Ok(downloads)
     }
 
     /// Gets download statistics
@@ -588,11 +685,31 @@ impl DatabaseManager {
             )
             .context("Failed to sum downloaded bytes")?;
 
+        let paused_downloads: i64 = self
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM downloads WHERE paused = 1",
+                [],
+                |row| row.get(0),
+            )
+            .context("Failed to count paused downloads")?;
+
+        let error_downloads: i64 = self
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM downloads WHERE error = 1",
+                [],
+                |row| row.get(0),
+            )
+            .context("Failed to count downloads with errors")?;
+
         Ok(DownloadStats {
             total_downloads: total_downloads as u64,
             completed_downloads: completed_downloads as u64,
             active_downloads: active_downloads as u64,
             total_downloaded_bytes,
+            paused_downloads: paused_downloads as u64,
+            error_downloads: error_downloads as u64,
         })
     }
 }
@@ -604,6 +721,8 @@ pub struct DownloadStats {
     pub completed_downloads: u64,
     pub active_downloads: u64,
     pub total_downloaded_bytes: u64,
+    pub paused_downloads: u64,
+    pub error_downloads: u64,
 }
 
 #[cfg(test)]
@@ -625,6 +744,8 @@ mod tests {
             date_added: Utc::now(),
             date_finished: None,
             active_time: 0,
+            paused: false,
+            error: false,
             parts: vec![
                 DownloadPart {
                     download_id: String::new(), // Will be filled by insert_download
@@ -663,11 +784,15 @@ mod tests {
         let retrieved = db_manager.get_download(&download.download_id)?.unwrap();
         assert_eq!(retrieved.filename, download.filename);
         assert_eq!(retrieved.parts.len(), 2);
+        assert_eq!(retrieved.paused, false);
+        assert_eq!(retrieved.error, false);
 
         // Test update
         let mut updated = retrieved.clone();
         updated.size_downloaded = 500000;
         updated.average_speed = 1024;
+        updated.paused = true;
+        updated.error = false;
         db_manager.update_download(&updated)?;
 
         // Test part update
@@ -684,16 +809,38 @@ mod tests {
         let all_downloads = db_manager.get_all_downloads()?;
         assert_eq!(all_downloads.len(), 1);
 
+        // Test pause status
+        db_manager.set_download_paused(&download.download_id, true)?;
+        let paused = db_manager.get_download(&download.download_id)?.unwrap();
+        assert_eq!(paused.paused, true);
+
+        // Test error status
+        db_manager.set_download_error(&download.download_id, true)?;
+        let with_error = db_manager.get_download(&download.download_id)?.unwrap();
+        assert_eq!(with_error.error, true);
+
+        // Test paused downloads
+        let paused_downloads = db_manager.get_paused_downloads()?;
+        assert_eq!(paused_downloads.len(), 1);
+
+        // Test error downloads
+        let error_downloads = db_manager.get_error_downloads()?;
+        assert_eq!(error_downloads.len(), 1);
+
         // Test mark as complete
         db_manager.mark_download_complete(&download.download_id)?;
         let completed = db_manager.get_download(&download.download_id)?.unwrap();
         assert!(completed.date_finished.is_some());
         assert_eq!(completed.size_downloaded, completed.total_size);
+        assert_eq!(completed.paused, false);
+        assert_eq!(completed.error, false);
 
         // Test stats
         let stats = db_manager.get_download_stats()?;
         assert_eq!(stats.total_downloads, 1);
         assert_eq!(stats.completed_downloads, 1);
+        assert_eq!(stats.paused_downloads, 0);
+        assert_eq!(stats.error_downloads, 0);
 
         // Test delete
         db_manager.delete_download(&download.download_id)?;
