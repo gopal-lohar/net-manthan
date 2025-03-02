@@ -4,7 +4,7 @@ members = [
     "cli",
     "download-manager",
     "native-message-host",
-    "net-manthan-core",
+    "download_engine",
     "utils",
 ]
 

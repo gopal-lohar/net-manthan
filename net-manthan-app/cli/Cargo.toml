@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 utils = { path = "../utils" }
-net-manthan-core ={ path = "../net-manthan-core" }
+download_engine = { path = "../download_engine" }
 clap = { version = "4.5.27", features = ["derive"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true

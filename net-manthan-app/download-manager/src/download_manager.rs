@@ -1,6 +1,6 @@
 use crate::download_db_manager::Download;
 use crossbeam_channel::{Receiver, Sender};
-use net_manthan_core::{
+use download_engine::{
     config::NetManthanConfig,
     types::{IpcRequest, IpcResponse},
 };

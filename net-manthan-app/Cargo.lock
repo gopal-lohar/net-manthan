@@ -261,7 +261,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "color-eyre",
- "net-manthan-core",
+ "download_engine",
  "tracing",
  "tracing-subscriber",
  "utils",
@@ -359,7 +359,7 @@ dependencies = [
  "bincode",
  "chrono",
  "crossbeam-channel",
- "net-manthan-core",
+ "download_engine",
  "rusqlite",
  "serde",
  "serde_json",
@@ -370,6 +370,23 @@ dependencies = [
  "tracing-subscriber",
  "utils",
  "uuid",
+]
+
+[[package]]
+name = "download_engine"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "colored",
+ "crossbeam-channel",
+ "futures-util",
+ "reqwest",
+ "serde",
+ "thiserror",
+ "tokio",
+ "toml",
+ "tracing",
 ]
 
 [[package]]
@@ -1010,7 +1027,7 @@ name = "native-message-host"
 version = "0.1.0"
 dependencies = [
  "chrome_native_messaging",
- "net-manthan-core",
+ "download_engine",
  "serde",
  "serde_json",
  "utils",
@@ -1031,23 +1048,6 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "tempfile",
-]
-
-[[package]]
-name = "net-manthan-core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "colored",
- "crossbeam-channel",
- "futures-util",
- "reqwest",
- "serde",
- "thiserror",
- "tokio",
- "toml",
- "tracing",
 ]
 
 [[package]]
@@ -1919,7 +1919,7 @@ name = "utils"
 version = "0.1.0"
 dependencies = [
  "bincode",
- "net-manthan-core",
+ "download_engine",
  "serde",
 ]
 

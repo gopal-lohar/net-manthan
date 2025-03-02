@@ -1,5 +1,5 @@
 use bincode;
-use net_manthan_core::types::{IpcRequest, IpcResponse};
+use download_engine::types::{IpcRequest, IpcResponse};
 use std::io::prelude::*;
 use std::net::TcpStream;
 

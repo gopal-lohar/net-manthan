@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use download_db_manager::connect_to_database;
+use download_engine::config::NetManthanConfig;
 use download_manager::DownloadManager;
 use ipc_server::start_ipc_server;
-use net_manthan_core::config::NetManthanConfig;
 
 pub mod download_db_manager;
 mod download_manager;

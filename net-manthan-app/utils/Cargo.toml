@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-net-manthan-core = { path = "../net-manthan-core" }
+download_engine = { path = "../download_engine" }
 bincode.workspace = true
 serde.workspace = true

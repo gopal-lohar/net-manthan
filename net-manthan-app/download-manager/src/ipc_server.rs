@@ -1,7 +1,7 @@
 use anyhow::Result;
 use bincode::{deserialize, serialize};
 use crossbeam_channel::{bounded, Receiver, Sender};
-use net_manthan_core::types::{IpcRequest, IpcResponse};
+use download_engine::types::{IpcRequest, IpcResponse};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::thread;

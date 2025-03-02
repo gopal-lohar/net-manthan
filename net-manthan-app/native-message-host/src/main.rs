@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use chrome_native_messaging::event_loop;
-use net_manthan_core::types::{IpcRequest, IpcResponse};
+use download_engine::types::{IpcRequest, IpcResponse};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utils::{Client, IPC_SOCKET_ADDRESS};
