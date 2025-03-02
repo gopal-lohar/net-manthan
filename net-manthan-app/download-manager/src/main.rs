@@ -1,18 +1,13 @@
-use std::{
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+use std::path::PathBuf;
 
 use download_db_manager::connect_to_database;
 use download_manager::DownloadManager;
 use ipc_server::start_ipc_server;
 use net_manthan_core::config::NetManthanConfig;
-use progress_manager::progress_manager;
 
 pub mod download_db_manager;
 mod download_manager;
 mod ipc_server;
-mod progress_manager;
 
 #[tokio::main]
 async fn main() {
@@ -21,7 +16,7 @@ async fn main() {
         Err(e) => NetManthanConfig::get_default_config(),
     };
 
-    let mut db_manager = match connect_to_database(&config.database_path) {
+    let db_manager = match connect_to_database(&config.database_path) {
         Ok(db_manager) => db_manager,
         Err(e) => {
             eprintln!("Failed to connect to database: {}", e);
@@ -38,17 +33,16 @@ async fn main() {
     };
 
     let ipc_server_address = format!("{}:{}", config.ipc_server_address, config.ipc_server_port);
-    // TODO: add an ipc secret or signing thing for security purposes lmao
+    // TODO: add an ipc secret or signing thing for security purposes (Supreme Leader Laughs)
+    // we are two months away from enriching weapons grade uranium... to be used for IPC communication only
     let (ipc_response_sender, ipc_request_receiver) = match start_ipc_server(&ipc_server_address) {
         Ok((sender, receiver)) => (sender, receiver),
-        Err(e) => {
-            _ = e;
+        Err(_) => {
             // eprintln!("Failed to start IPC server: {}", e); // TODO: use logs
             std::process::exit(1);
         }
     };
 
-    let download_manager = Arc::new(Mutex::new(DownloadManager::new(all_downloads, config)));
-
-    tokio::spawn(progress_manager(db_manager, download_manager.clone()));
+    let download_manager = DownloadManager::new(all_downloads, config);
+    download_manager.start(ipc_response_sender, ipc_request_receiver);
 }

@@ -6,6 +6,7 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 
+// TODO: this has some race conditions going on but who cares?
 pub fn start_ipc_server(address: &String) -> Result<(Sender<IpcResponse>, Receiver<IpcRequest>)> {
     let (ipc_request_sender, ipc_request_receiver) = bounded::<IpcRequest>(100);
     let (ipc_response_sender, ipc_response_receiver) = bounded::<IpcResponse>(100);
