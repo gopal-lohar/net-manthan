@@ -100,8 +100,8 @@ fn create_download_file(filepath: &PathBuf, size: u64) -> Result<(), DownloadErr
 
 fn get_download_parts(
     thread_count: u8,
-    download_id: String,
-    download_info: DownloadInfo,
+    download_id: &String,
+    download_info: &DownloadInfo,
 ) -> Vec<DownloadPart> {
     let mut parts = Vec::<DownloadPart>::new();
     let part_size = download_info.size as f64 / thread_count as f64;
@@ -123,21 +123,48 @@ impl Download {
     pub async fn new(
         request: DownloadRequest,
         config: NetManthanConfig,
-    ) -> Result<(), DownloadError> {
+    ) -> Result<Self, DownloadError> {
         let download_id = uuid::Uuid::new_v4().to_string();
         let download_info = get_download_info(&request).await?;
+
+        // create file
         let filepath = request
             .filepath
             .unwrap_or_else(|| config.download_dir.clone());
+        let filename_from_info = download_info.filename.clone();
         let filename = request.filename.unwrap_or_else(|| {
-            download_info
-                .filename
-                .unwrap_or_else(|| format!("unknow_download_{}", download_id))
+            filename_from_info.unwrap_or_else(|| format!("unknow_download_{}", download_id))
         });
-        filepath.join(filename);
+        filepath.join(filename.clone());
         create_download_file(&filepath, download_info.size)?;
 
-        Ok(())
+        let parts = get_download_parts(config.thread_count, &download_id, &download_info);
+
+        let fallback_download_dir = config.download_dir.to_str().unwrap_or_else(|| "");
+        let fallback_file_path =
+            format!("{}unknow_download_{}", fallback_download_dir, download_id);
+
+        Ok(Download {
+            download_id,
+            filename: filename.clone(),
+            // filpath will not be None most probably
+            path: filepath
+                .to_str()
+                .unwrap_or_else(|| &fallback_file_path)
+                .to_string(),
+            referrer: request.referrer,
+            download_link: request.url,
+            resumable: download_info.resume,
+            total_size: download_info.size,
+            size_downloaded: 0,
+            average_speed: 0,
+            date_added: Utc::now(),
+            date_finished: None,
+            active_time: 0,
+            paused: true,
+            error: false,
+            parts,
+        })
     }
 }
 
@@ -149,10 +176,6 @@ pub async fn download(
 ) -> Result<(), DownloadError> {
     let mut download_handles = Vec::new();
     let (aggregator_sender, aggregator_receiver) = bounded::<PartProgress>(100);
-    let download_info = get_download_info(&request).await?;
-    create_download_file(&request.filepath, download_info.size)?;
-    let download_id = uuid::Uuid::new_v4().to_string();
-    let parts = get_download_parts(config.thread_count, download_id, download_info);
 
     {
         let initial_progress = parts

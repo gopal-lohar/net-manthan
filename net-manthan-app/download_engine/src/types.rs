@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DownloadRequest {
     pub url: String,
+    pub referrer: Option<String>,
     pub filepath: Option<PathBuf>,
     pub filename: Option<String>,
     pub headers: Option<Vec<String>>,
