@@ -1,39 +1,9 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
+use download_engine::{Download, Download_Part};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
-
-/// Represents a download in the database
-#[derive(Debug, Clone)]
-pub struct Download {
-    pub download_id: String,
-    pub filename: String,
-    pub path: String,
-    pub referrer: Option<String>,
-    pub download_link: String,
-    pub resumable: bool,
-    pub total_size: u64,
-    pub size_downloaded: u64,
-    pub average_speed: u64,
-    pub date_added: DateTime<Utc>,
-    pub date_finished: Option<DateTime<Utc>>,
-    pub active_time: i64, // Stored as seconds
-    pub paused: bool,     // New field: indicates if the download is currently paused
-    pub error: bool,      // New field: indicates if the download has encountered an error
-    pub parts: Vec<DownloadPart>,
-}
-
-/// Represents a part of a download in the database
-#[derive(Debug, Clone)]
-pub struct DownloadPart {
-    pub download_id: String,
-    pub part_id: String,
-    pub start_bytes: u64,
-    pub end_bytes: u64,
-    pub total_bytes: u64,
-    pub bytes_downloaded: u64,
-}
 
 // connecting to the database
 pub fn connect_to_database(db_path: &PathBuf) -> Result<DatabaseManager> {

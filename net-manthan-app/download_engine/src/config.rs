@@ -7,7 +7,8 @@ use std::path::PathBuf;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NetManthanConfig {
     pub auto_resume: bool,
-    pub default_threads: u8,
+    pub thread_count: u8,
+    pub update_interval_in_ms: i64,
     pub single_threaded_buffer_size_in_kb: u64,
     pub multi_threaded_buffer_size_in_kb: u64,
     pub ipc_server_address: String,
@@ -22,7 +23,8 @@ impl NetManthanConfig {
     pub fn get_default_config() -> Self {
         NetManthanConfig {
             auto_resume: false,
-            default_threads: 5,
+            thread_count: 5,
+            update_interval_in_ms: 1000,
             single_threaded_buffer_size_in_kb: 1024,
             multi_threaded_buffer_size_in_kb: 1024,
             ipc_server_address: String::from("127.0.0.1"),

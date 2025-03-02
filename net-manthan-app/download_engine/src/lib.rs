@@ -1,5 +1,8 @@
 use crate::types::DownloadRequest;
 use crate::types::PartProgress;
+use chrono::DateTime;
+use chrono::Utc;
+use config::NetManthanConfig;
 use crossbeam_channel::bounded;
 use crossbeam_channel::Sender;
 use download_part::download_part;
@@ -7,12 +10,10 @@ use errors::DownloadError;
 use get_download_info::get_download_info;
 use get_download_info::DownloadInfo;
 use progress_aggregator::progress_aggregator;
+use std::fs::File;
 use std::path::PathBuf;
-use std::{
-    fs::OpenOptions,
-    sync::{atomic::AtomicBool, Arc},
-};
-use types::DownloadPart;
+use std::sync::{atomic::AtomicBool, Arc};
+use uuid::Uuid;
 
 pub mod config;
 pub mod download_part;
@@ -21,58 +22,145 @@ pub mod get_download_info;
 pub mod progress_aggregator;
 pub mod types;
 
+/// Represents a download in the database
+#[derive(Debug, Clone)]
+pub struct Download {
+    pub download_id: String,
+    pub filename: String,
+    pub path: String,
+    pub referrer: Option<String>,
+    pub download_link: String,
+    pub resumable: bool,
+    pub total_size: u64,
+    pub size_downloaded: u64,
+    pub average_speed: u64,
+    pub date_added: DateTime<Utc>,
+    pub date_finished: Option<DateTime<Utc>>,
+    pub active_time: u64, // Stored as seconds
+    pub paused: bool,     // New field: indicates if the download is currently paused
+    pub error: bool,      // New field: indicates if the download has encountered an error
+    pub parts: Vec<DownloadPart>,
+}
+
+/// Represents a part of a download in the database
+#[derive(Debug, Clone)]
+pub struct DownloadPart {
+    pub download_id: String,
+    pub part_id: String,
+    pub start_bytes: u64,
+    pub end_bytes: u64,
+    pub total_bytes: u64,
+    pub bytes_downloaded: u64,
+}
+
+// fn create_download_file(filepath: &PathBuf, size: u64) -> Result<(), DownloadError> {
+//     match OpenOptions::new().create(true).write(true).open(filepath) {
+//         Ok(handle) => match handle.set_len(size) {
+//             Ok(_) => Ok(()),
+//             Err(err) => Err(DownloadError::FileSystemError(err)),
+//         },
+//         Err(err) => Err(DownloadError::FileSystemError(err)),
+//     }
+// }
+
 fn create_download_file(filepath: &PathBuf, size: u64) -> Result<(), DownloadError> {
-    match OpenOptions::new().create(true).write(true).open(filepath) {
-        Ok(handle) => match handle.set_len(size) {
-            Ok(_) => Ok(()),
-            Err(err) => Err(DownloadError::FileSystemError(err)),
-        },
+    let mut path = filepath.clone();
+    if path.exists() {
+        let mut count = 1;
+        let parent = path.parent().unwrap_or_else(|| std::path::Path::new(""));
+        let stem = path.file_stem().unwrap_or_default().to_string_lossy();
+        let ext = path.extension().unwrap_or_default().to_string_lossy();
+
+        loop {
+            let new_name = format!("{} ({})", stem, count);
+            let new_path = if ext.is_empty() {
+                parent.join(new_name)
+            } else {
+                parent.join(format!("{}.{}", new_name, ext))
+            };
+
+            if !new_path.exists() {
+                path = new_path;
+                break;
+            }
+            count += 1;
+        }
+    }
+
+    let file = match File::create(path) {
+        Ok(file) => file,
+        Err(err) => return Err(DownloadError::FileSystemError(err)),
+    };
+
+    match file.set_len(size) {
+        Ok(_) => Ok(()),
         Err(err) => Err(DownloadError::FileSystemError(err)),
     }
 }
 
-fn get_download_parts(thread_count: u8, download_info: DownloadInfo) -> Vec<DownloadPart> {
+fn get_download_parts(
+    thread_count: u8,
+    download_id: String,
+    download_info: DownloadInfo,
+) -> Vec<DownloadPart> {
     let mut parts = Vec::<DownloadPart>::new();
+    let part_size = download_info.size as f64 / thread_count as f64;
     for i in 0..thread_count {
         let part = DownloadPart {
-            part_id: i,
+            download_id: download_id.clone(),
+            part_id: Uuid::new_v4().to_string(),
+            start_bytes: (part_size * i as f64).round() as u64,
+            end_bytes: (part_size * (i + 1) as f64).round() as u64,
+            total_bytes: part_size.round() as u64,
             bytes_downloaded: 0,
-            range: match download_info.resume {
-                true => Some((
-                    (download_info.size as f64 / thread_count as f64 * i as f64).round() as u64,
-                    (download_info.size as f64 / thread_count as f64 * (i + 1) as f64).round()
-                        as u64,
-                )),
-                false => None,
-            },
         };
         parts.push(part);
     }
     parts
 }
 
+impl Download {
+    pub async fn new(
+        request: DownloadRequest,
+        config: NetManthanConfig,
+    ) -> Result<(), DownloadError> {
+        let download_id = uuid::Uuid::new_v4().to_string();
+        let download_info = get_download_info(&request).await?;
+        let filepath = request
+            .filepath
+            .unwrap_or_else(|| config.download_dir.clone());
+        let filename = request.filename.unwrap_or_else(|| {
+            download_info
+                .filename
+                .unwrap_or_else(|| format!("unknow_download_{}", download_id))
+        });
+        filepath.join(filename);
+        create_download_file(&filepath, download_info.size)?;
+
+        Ok(())
+    }
+}
+
 pub async fn download(
-    mut request: DownloadRequest,
+    request: DownloadRequest,
     cancel_token: Arc<AtomicBool>,
     progress_sender: Sender<Vec<PartProgress>>,
+    config: NetManthanConfig,
 ) -> Result<(), DownloadError> {
     let mut download_handles = Vec::new();
     let (aggregator_sender, aggregator_receiver) = bounded::<PartProgress>(100);
     let download_info = get_download_info(&request).await?;
     create_download_file(&request.filepath, download_info.size)?;
-
-    let parts = match request.parts {
-        Some(parts) => parts,
-        None => get_download_parts(request.config.thread_count, download_info),
-    };
+    let download_id = uuid::Uuid::new_v4().to_string();
+    let parts = get_download_parts(config.thread_count, download_id, download_info);
 
     {
         let initial_progress = parts
             .iter()
             .map(|part| PartProgress {
-                part_id: part.part_id,
+                part_id: part.part_id.clone(),
                 bytes_downloaded: part.bytes_downloaded,
-                total_bytes: part.range.map(|(start, end)| end - start + 1).unwrap_or(0),
+                total_bytes: part.total_bytes,
                 speed: 0,
                 timestamp: chrono::Utc::now(),
                 error: false,
@@ -84,13 +172,10 @@ pub async fn download(
             initial_progress,
             progress_receiver,
             progress_sender,
-            request.config.update_interval,
+            chrono::Duration::milliseconds(config.update_interval_in_ms),
             cancel_token,
         ));
     }
-
-    // deliberately set parts to None, so that it can't be used later
-    request.parts = None;
 
     for part in parts {
         let aggregator_sender = aggregator_sender.clone();
@@ -104,21 +189,5 @@ pub async fn download(
         download_handles.push(handle);
     }
 
-    for handle in download_handles {
-        match handle.await {
-            Ok(part) => {
-                if let Err(err) = part {
-                    cancel_token.store(true, std::sync::atomic::Ordering::Relaxed);
-                    return Err(err);
-                }
-            }
-            Err(_) => {
-                cancel_token.store(true, std::sync::atomic::Ordering::Relaxed);
-                return Err(DownloadError::DownloadInterrupted);
-            }
-        }
-    }
-
-    cancel_token.store(true, std::sync::atomic::Ordering::Relaxed);
     Ok(())
 }

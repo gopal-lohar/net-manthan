@@ -1,35 +1,22 @@
 use std::path::PathBuf;
 
 use crate::config::NetManthanConfig;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DownloadRequest {
     pub url: String,
-    pub filepath: PathBuf,
+    pub filepath: Option<PathBuf>,
+    pub filename: Option<String>,
     pub headers: Option<Vec<String>>,
-    pub parts: Option<Vec<DownloadPart>>,
-    pub config: DownloadRequestConfig,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct DownloadRequestConfig {
-    pub thread_count: u8,
-    pub buffer_size: usize,
-    pub update_interval: Duration,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct DownloadPart {
-    pub part_id: u8,
-    pub bytes_downloaded: u64,
-    pub range: Option<(u64, u64)>,
-}
-
+/// for communicating progress for each part of a download
+/// (the aggregator thread just sends a vector of these)
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PartProgress {
-    pub part_id: u8,
+    pub part_id: String,
     pub bytes_downloaded: u64,
     pub total_bytes: u64,
     pub speed: u64,
