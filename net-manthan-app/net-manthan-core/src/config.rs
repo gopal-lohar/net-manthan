@@ -10,9 +10,28 @@ pub struct NetManthanConfig {
     pub default_threads: u8,
     pub single_threaded_buffer_size_in_kb: u64,
     pub multi_threaded_buffer_size_in_kb: u64,
+    pub ipc_server_address: String,
+    pub ipc_server_port: u16,
     pub download_dir: PathBuf,
     pub database_path: PathBuf,
     pub log_path: PathBuf,
+}
+
+// it's here just because that way it's easier to change things
+impl NetManthanConfig {
+    pub fn get_default_config() -> Self {
+        NetManthanConfig {
+            auto_resume: false,
+            default_threads: 5,
+            single_threaded_buffer_size_in_kb: 1024,
+            multi_threaded_buffer_size_in_kb: 1024,
+            ipc_server_address: String::from("127.0.0.1"),
+            ipc_server_port: 8814,
+            download_dir: PathBuf::from("./.dev/downloads"),
+            database_path: PathBuf::from("./.dev/downloads.db"),
+            log_path: PathBuf::from("./.dev/log.txt"),
+        }
+    }
 }
 
 impl NetManthanConfig {
@@ -46,17 +65,5 @@ impl NetManthanConfig {
         file.write_all(toml_string.as_bytes())?;
 
         Ok(())
-    }
-
-    pub fn get_default_config() -> Self {
-        NetManthanConfig {
-            auto_resume: false,
-            default_threads: 5,
-            single_threaded_buffer_size_in_kb: 1024,
-            multi_threaded_buffer_size_in_kb: 1024,
-            download_dir: PathBuf::from("./.dev/downloads"),
-            database_path: PathBuf::from("./.dev/downloads.db"),
-            log_path: PathBuf::from("./.dev/log.txt"),
-        }
     }
 }
