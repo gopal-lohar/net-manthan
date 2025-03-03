@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use download_engine::{Download, Download_Part};
+use download_engine::{Download, DownloadPart};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use std::path::{Path, PathBuf};
 use uuid::Uuid;

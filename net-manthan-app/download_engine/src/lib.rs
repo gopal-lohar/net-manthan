@@ -1,6 +1,7 @@
 use crate::types::DownloadRequest;
 use crate::types::PartProgress;
 use chrono::DateTime;
+use chrono::Duration;
 use chrono::Utc;
 use config::NetManthanConfig;
 use crossbeam_channel::bounded;
@@ -128,14 +129,14 @@ impl Download {
         let download_info = get_download_info(&request).await?;
 
         // create file
-        let filepath = request
+        let mut filepath = request
             .filepath
             .unwrap_or_else(|| config.download_dir.clone());
         let filename_from_info = download_info.filename.clone();
         let filename = request.filename.unwrap_or_else(|| {
             filename_from_info.unwrap_or_else(|| format!("unknow_download_{}", download_id))
         });
-        filepath.join(filename.clone());
+        filepath = filepath.join(filename.clone());
         create_download_file(&filepath, download_info.size)?;
 
         let parts = get_download_parts(config.thread_count, &download_id, &download_info);
@@ -173,6 +174,7 @@ impl Download {
         config: NetManthanConfig,
     ) -> Arc<AtomicBool> {
         let cancel_token = Arc::new(AtomicBool::new(false));
+        let config = Arc::new(config);
         let (progress_sender, progress_receiver) = bounded::<PartProgress>(100);
         {
             let initial_progress = self
@@ -190,21 +192,40 @@ impl Download {
             tokio::spawn(progress_aggregator(
                 initial_progress,
                 progress_receiver,
-                aggregator_sender,
+                aggregator_sender.clone(),
                 chrono::Duration::milliseconds(config.update_interval_in_ms),
                 Arc::clone(&cancel_token),
             ));
         }
 
-        for part in self.parts {
-            let aggregator_sender = aggregator_sender.clone();
+        let buffer_size = (if self.parts.len() > 1 {
+            config.multi_threaded_buffer_size_in_kb
+        } else {
+            config.single_threaded_buffer_size_in_kb
+        }) * 1024;
+
+        for part in &self.parts {
+            // let config = Arc::clone(&config);
             let cancel_token = cancel_token.clone();
-            // let handle = tokio::spawn(download_part(
-            //     request.clone(),
-            //     part,
-            //     progress_sender,
-            //     cancel_token,
-            // ));
+            let range = if self.resumable {
+                Some((part.start_bytes, part.end_bytes))
+            } else {
+                None
+            };
+
+            let part_id = part.part_id.clone();
+            tokio::spawn(download_part(
+                self.download_link.clone(),
+                None, // TODO: Implement headers, both while checking the download and while downloading
+                part_id,
+                range,
+                part.bytes_downloaded,
+                PathBuf::from(self.path.clone()),
+                buffer_size,
+                progress_sender.clone(),
+                Duration::milliseconds(config.update_interval_in_ms),
+                cancel_token,
+            ));
         }
 
         return cancel_token;

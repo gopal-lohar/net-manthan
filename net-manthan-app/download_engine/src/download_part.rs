@@ -1,9 +1,5 @@
-use crate::{
-    errors::DownloadError,
-    types::{DownloadRequest, PartProgress},
-    DownloadPart,
-};
-use chrono::Utc;
+use crate::{errors::DownloadError, types::PartProgress};
+use chrono::{Duration, Utc};
 use crossbeam_channel::Sender;
 use futures_util::StreamExt;
 use reqwest::{
@@ -24,7 +20,7 @@ fn open_download_file(
     filepath: PathBuf,
     range: Option<(u64, u64)>,
     bytes_downloaded: u64,
-    buffer_size: usize,
+    buffer_size: u64,
 ) -> Result<BufWriter<File>, std::io::Error> {
     let mut file = OpenOptions::new().write(true).open(filepath)?;
     match range {
@@ -33,24 +29,33 @@ fn open_download_file(
         }
         None => {}
     }
-    let file_writer = BufWriter::with_capacity(buffer_size, file);
+    let file_writer = BufWriter::with_capacity(buffer_size as usize, file);
     Ok(file_writer)
 }
 
+/*
+part_id,
+range,
+part.bytes_downloaded,
+file_path.clone(),
+config,
+progress_sender.clone(),
+cancel_token,
+*/
+
 pub async fn download_part(
-    request: DownloadRequest,
-    part: DownloadPart,
+    url: String,
+    headers: Option<Vec<String>>,
+    part_id: String,
+    range: Option<(u64, u64)>,
+    mut bytes_downloaded: u64,
+    filepath: PathBuf,
+    buffer_size: u64,
     progress_sender: Sender<PartProgress>,
+    update_interval: Duration,
     cancel_token: Arc<AtomicBool>,
 ) -> Result<(), DownloadError> {
-    let mut bytes_downloaded: u64 = part.bytes_downloaded;
-
-    let mut file_writer = match open_download_file(
-        request.filepath,
-        part.range,
-        bytes_downloaded,
-        request.config.buffer_size,
-    ) {
+    let mut file_writer = match open_download_file(filepath, range, bytes_downloaded, buffer_size) {
         Ok(file) => file,
         Err(err) => {
             return Err(DownloadError::FileSystemError(err));
@@ -59,9 +64,9 @@ pub async fn download_part(
 
     let client = Client::new();
 
-    let mut req = client.get(&request.url);
+    let mut req = client.get(&url);
 
-    if let Some(headers) = &request.headers {
+    if let Some(headers) = headers {
         let mut header_map = HeaderMap::new();
         for header in headers {
             if let Some((name, value)) = header.split_once(": ") {
@@ -76,7 +81,7 @@ pub async fn download_part(
         req = req.headers(header_map);
     }
 
-    let sent_request = match part.range {
+    let sent_request = match range {
         Some((start, end)) => {
             req.header(header::RANGE, format!("bytes={}-{}", start, end))
                 .send()
@@ -123,7 +128,7 @@ pub async fn download_part(
                     .map_err(DownloadError::from_write_error)?;
                 bytes_downloaded_last += chunk.len() as u64;
                 let elapsed = Utc::now() - last_update_time;
-                if elapsed >= request.config.update_interval {
+                if elapsed >= update_interval {
                     speed_in_bytes =
                         ((bytes_downloaded_last as f64) / elapsed.num_seconds() as f64) as u64;
                     bytes_downloaded += bytes_downloaded_last;
@@ -131,7 +136,7 @@ pub async fn download_part(
                     last_update_time = Utc::now();
 
                     let progress = PartProgress {
-                        part_id: part.part_id,
+                        part_id: part_id.clone(),
                         bytes_downloaded,
                         total_bytes: download_size,
                         speed: speed_in_bytes,
@@ -158,7 +163,7 @@ pub async fn download_part(
 
     bytes_downloaded += bytes_downloaded_last;
     let progress = PartProgress {
-        part_id: part.part_id,
+        part_id,
         bytes_downloaded,
         total_bytes: download_size,
         speed: speed_in_bytes,
