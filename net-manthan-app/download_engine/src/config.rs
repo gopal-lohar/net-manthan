@@ -31,7 +31,7 @@ impl NetManthanConfig {
             ipc_server_port: 8814,
             download_dir: PathBuf::from("./.dev/downloads"),
             database_path: PathBuf::from("./.dev/downloads.db"),
-            log_path: PathBuf::from("./.dev/log.txt"),
+            log_path: PathBuf::from("./.dev/logs/"),
         }
     }
 }

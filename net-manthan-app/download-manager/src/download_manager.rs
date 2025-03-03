@@ -23,5 +23,6 @@ impl DownloadManager {
         ipc_response_sender: Sender<IpcResponse>,
         ipc_request_receiver: Receiver<IpcRequest>,
     ) {
+        loop {}
     }
 }
