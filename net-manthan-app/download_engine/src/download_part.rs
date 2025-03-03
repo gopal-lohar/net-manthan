@@ -1,6 +1,7 @@
 use crate::{
     errors::DownloadError,
-    types::{DownloadPart, DownloadRequest, PartProgress},
+    types::{DownloadRequest, PartProgress},
+    DownloadPart,
 };
 use chrono::Utc;
 use crossbeam_channel::Sender;

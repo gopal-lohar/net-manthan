@@ -4,7 +4,6 @@ use chrono::DateTime;
 use chrono::Utc;
 use config::NetManthanConfig;
 use crossbeam_channel::bounded;
-use crossbeam_channel::Receiver;
 use crossbeam_channel::Sender;
 use download_part::download_part;
 use errors::DownloadError;
@@ -168,49 +167,46 @@ impl Download {
         })
     }
 
-    pub fn start(&self, aggregator_sender: Receiver<PartProgress>) {}
-}
+    pub fn start(
+        &self,
+        aggregator_sender: Sender<Vec<PartProgress>>,
+        config: NetManthanConfig,
+    ) -> Arc<AtomicBool> {
+        let cancel_token = Arc::new(AtomicBool::new(false));
+        let (progress_sender, progress_receiver) = bounded::<PartProgress>(100);
+        {
+            let initial_progress = self
+                .parts
+                .iter()
+                .map(|part| PartProgress {
+                    part_id: part.part_id.clone(),
+                    bytes_downloaded: part.bytes_downloaded,
+                    total_bytes: part.total_bytes,
+                    speed: self.average_speed,
+                    timestamp: chrono::Utc::now(),
+                    error: false,
+                })
+                .collect::<Vec<PartProgress>>();
+            tokio::spawn(progress_aggregator(
+                initial_progress,
+                progress_receiver,
+                aggregator_sender,
+                chrono::Duration::milliseconds(config.update_interval_in_ms),
+                Arc::clone(&cancel_token),
+            ));
+        }
 
-pub async fn download(
-    request: DownloadRequest,
-    cancel_token: Arc<AtomicBool>,
-    progress_sender: Sender<Vec<PartProgress>>,
-    config: NetManthanConfig,
-) -> Result<(), DownloadError> {
-    {
-        let initial_progress = parts
-            .iter()
-            .map(|part| PartProgress {
-                part_id: part.part_id.clone(),
-                bytes_downloaded: part.bytes_downloaded,
-                total_bytes: part.total_bytes,
-                speed: 0,
-                timestamp: chrono::Utc::now(),
-                error: false,
-            })
-            .collect::<Vec<PartProgress>>();
-        let cancel_token = cancel_token.clone();
-        let progress_receiver = aggregator_receiver.clone();
-        tokio::spawn(progress_aggregator(
-            initial_progress,
-            progress_receiver,
-            progress_sender,
-            chrono::Duration::milliseconds(config.update_interval_in_ms),
-            cancel_token,
-        ));
+        for part in self.parts {
+            let aggregator_sender = aggregator_sender.clone();
+            let cancel_token = cancel_token.clone();
+            // let handle = tokio::spawn(download_part(
+            //     request.clone(),
+            //     part,
+            //     progress_sender,
+            //     cancel_token,
+            // ));
+        }
+
+        return cancel_token;
     }
-
-    for part in parts {
-        let aggregator_sender = aggregator_sender.clone();
-        let cancel_token = cancel_token.clone();
-        let handle = tokio::spawn(download_part(
-            request.clone(),
-            part,
-            aggregator_sender,
-            cancel_token,
-        ));
-        download_handles.push(handle);
-    }
-
-    Ok(())
 }
