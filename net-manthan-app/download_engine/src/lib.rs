@@ -4,6 +4,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use config::NetManthanConfig;
 use crossbeam_channel::bounded;
+use crossbeam_channel::Receiver;
 use crossbeam_channel::Sender;
 use download_part::download_part;
 use errors::DownloadError;
@@ -166,6 +167,8 @@ impl Download {
             parts,
         })
     }
+
+    pub fn start(&self, aggregator_sender: Receiver<PartProgress>) {}
 }
 
 pub async fn download(
@@ -174,9 +177,6 @@ pub async fn download(
     progress_sender: Sender<Vec<PartProgress>>,
     config: NetManthanConfig,
 ) -> Result<(), DownloadError> {
-    let mut download_handles = Vec::new();
-    let (aggregator_sender, aggregator_receiver) = bounded::<PartProgress>(100);
-
     {
         let initial_progress = parts
             .iter()
