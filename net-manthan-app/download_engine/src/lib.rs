@@ -11,6 +11,7 @@ use errors::DownloadError;
 use get_download_info::get_download_info;
 use get_download_info::DownloadInfo;
 use progress_aggregator::progress_aggregator;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::{atomic::AtomicBool, Arc};
@@ -24,7 +25,7 @@ pub mod progress_aggregator;
 pub mod types;
 
 /// Represents a download in the database
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Download {
     pub download_id: String,
     pub filename: String,
@@ -44,7 +45,7 @@ pub struct Download {
 }
 
 /// Represents a part of a download in the database
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DownloadPart {
     pub download_id: String,
     pub part_id: String,

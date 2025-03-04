@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::config::NetManthanConfig;
+use crate::{config::NetManthanConfig, Download};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -70,7 +70,8 @@ pub enum IpcResponse {
     Success,
     Error(String),
     DownloadProgress(DownloadProgress),
-    DownloadsList(Vec<DownloadInfo>),
+    DownloadsList(Vec<Download>),
+    Config(NetManthanConfig),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

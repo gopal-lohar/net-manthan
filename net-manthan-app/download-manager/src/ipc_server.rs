@@ -49,68 +49,57 @@ fn handle_client(
     ipc_request_sender: Sender<IpcRequest>,
 ) {
     let mut length_buffer = [0u8; 8];
-    info!("handling the client");
     while let Ok(_) = stream.read_exact(&mut length_buffer) {
-        debug!("Read something from the tcp stream");
         let message_length = u64::from_le_bytes(length_buffer) as usize;
 
         let mut message_buffer = vec![0u8; message_length];
 
-        debug!("size message_length is {}", message_length);
+        debug!("length of message received: {}", message_length);
 
         match stream.read_exact(&mut message_buffer) {
-            Ok(_) => {
-                info!("message received");
-                match deserialize::<IpcRequest>(&message_buffer) {
-                    Ok(request) => {
-                        info!(
-                            "ipc request over tcp received from the client : {:?}",
-                            request
-                        );
-                        if let Err(e) = ipc_request_sender.send(request) {
-                            error!("Failed to forward IPC request: {}", e);
-                            break;
-                        }
-                        debug!("request forwarded to the crossbeam channel");
-
-                        match ipc_response_receiver.recv() {
-                            Ok(response) => match serialize(&response) {
-                                Ok(data) => {
-                                    debug!("received response from the crossbeam channel");
-                                    if let Err(e) =
-                                        stream.write_all(&(data.len() as u64).to_le_bytes())
-                                    {
-                                        error!("Failed to send response length: {}", e);
-                                        break;
-                                    };
-                                    if let Err(e) = stream.write_all(&data) {
-                                        error!("Failed to send response: {}", e);
-                                        break;
-                                    }
-                                    if let Err(e) = stream.flush() {
-                                        error!("Failed to send response (while flushing): {}", e);
-                                        break;
-                                    } else {
-                                        info!("Response sent successfully");
-                                    }
-                                }
-                                Err(e) => {
-                                    error!("Failed to serialize response: {}", e);
-                                    break;
-                                }
-                            },
-                            Err(e) => {
-                                error!("Failed to receive response: {}", e);
-                                break;
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        error!("Failed to deserialize request: {}", e);
+            Ok(_) => match deserialize::<IpcRequest>(&message_buffer) {
+                Ok(request) => {
+                    info!("IPC message received from the client: {:?}", request);
+                    if let Err(e) = ipc_request_sender.send(request) {
+                        error!("Failed to forward IPC request: {}", e);
                         break;
                     }
+
+                    match ipc_response_receiver.recv() {
+                        Ok(response) => match serialize(&response) {
+                            Ok(data) => {
+                                if let Err(e) = stream.write_all(&(data.len() as u64).to_le_bytes())
+                                {
+                                    error!("Failed to send response length: {}", e);
+                                    break;
+                                };
+                                if let Err(e) = stream.write_all(&data) {
+                                    error!("Failed to send response: {}", e);
+                                    break;
+                                }
+                                if let Err(e) = stream.flush() {
+                                    error!("Failed to send response (while flushing): {}", e);
+                                    break;
+                                } else {
+                                    info!("Response sent to client successfully: {:?}", response);
+                                }
+                            }
+                            Err(e) => {
+                                error!("Failed to serialize response: {}", e);
+                                break;
+                            }
+                        },
+                        Err(e) => {
+                            error!("Failed to receive response: {}", e);
+                            break;
+                        }
+                    }
                 }
-            }
+                Err(e) => {
+                    error!("Failed to deserialize request: {}", e);
+                    break;
+                }
+            },
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::UnexpectedEof {
                     debug!("Client disconnected");
