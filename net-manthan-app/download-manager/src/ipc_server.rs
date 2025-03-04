@@ -5,6 +5,7 @@ use download_engine::types::{IpcRequest, IpcResponse};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
+use tracing::{debug, error, info};
 
 // TODO: this has some race conditions going on but who cares?
 pub fn start_ipc_server(address: &String) -> Result<(Sender<IpcResponse>, Receiver<IpcRequest>)> {
@@ -22,12 +23,18 @@ pub fn start_ipc_server(address: &String) -> Result<(Sender<IpcResponse>, Receiv
                 Ok(stream) => {
                     let response_rx = ipc_response_receiver.clone();
                     let request_tx = ipc_request_sender.clone();
+                    let peer_addr = match stream.peer_addr() {
+                        Ok(addr) => addr.to_string(),
+                        Err(_) => "Unknown Address".to_string(),
+                    };
+
+                    info!("A client connected with addr - {}", peer_addr);
                     thread::spawn(move || {
                         handle_client(stream, response_rx, request_tx);
                     });
                 }
                 Err(e) => {
-                    eprintln!("Connection failed: {}", e);
+                    error!("Connection failed: {}", e);
                 }
             }
         }
@@ -36,52 +43,80 @@ pub fn start_ipc_server(address: &String) -> Result<(Sender<IpcResponse>, Receiv
     Ok((ipc_response_sender, ipc_request_receiver))
 }
 
-// TODO: use the freaking logs not eprintln! and stuff
 fn handle_client(
     mut stream: TcpStream,
     ipc_response_receiver: Receiver<IpcResponse>,
     ipc_request_sender: Sender<IpcRequest>,
 ) {
-    let mut buffer = [0; 1024]; // TODO: change buffer size?
-    stream
-        .set_read_timeout(Some(std::time::Duration::from_secs(30)))
-        .expect("Failed to set read timeout"); // Read timeout
+    let mut length_buffer = [0u8; 8];
+    info!("handling the client");
+    while let Ok(_) = stream.read_exact(&mut length_buffer) {
+        debug!("Read something from the tcp stream");
+        let message_length = u64::from_le_bytes(length_buffer) as usize;
 
-    while let Ok(n) = stream.read(&mut buffer) {
-        if n == 0 {
-            // Connection closed
-            break;
-        }
+        let mut message_buffer = vec![0u8; message_length];
 
-        match deserialize::<IpcRequest>(&buffer[0..n]) {
-            Ok(request) => {
-                if let Err(e) = ipc_request_sender.send(request) {
-                    eprintln!("Failed to forward IPC request: {}", e);
-                    break;
-                }
+        debug!("size message_length is {}", message_length);
 
-                match ipc_response_receiver.recv() {
-                    Ok(response) => match serialize(&response) {
-                        Ok(data) => {
-                            if let Err(e) = stream.write_all(&data) {
-                                eprintln!("Failed to send response: {}", e);
+        match stream.read_exact(&mut message_buffer) {
+            Ok(_) => {
+                info!("message received");
+                match deserialize::<IpcRequest>(&message_buffer) {
+                    Ok(request) => {
+                        info!(
+                            "ipc request over tcp received from the client : {:?}",
+                            request
+                        );
+                        if let Err(e) = ipc_request_sender.send(request) {
+                            error!("Failed to forward IPC request: {}", e);
+                            break;
+                        }
+                        debug!("request forwarded to the crossbeam channel");
+
+                        match ipc_response_receiver.recv() {
+                            Ok(response) => match serialize(&response) {
+                                Ok(data) => {
+                                    debug!("received response from the crossbeam channel");
+                                    if let Err(e) =
+                                        stream.write_all(&(data.len() as u64).to_le_bytes())
+                                    {
+                                        error!("Failed to send response length: {}", e);
+                                        break;
+                                    };
+                                    if let Err(e) = stream.write_all(&data) {
+                                        error!("Failed to send response: {}", e);
+                                        break;
+                                    }
+                                    if let Err(e) = stream.flush() {
+                                        error!("Failed to send response (while flushing): {}", e);
+                                        break;
+                                    } else {
+                                        info!("Response sent successfully");
+                                    }
+                                }
+                                Err(e) => {
+                                    error!("Failed to serialize response: {}", e);
+                                    break;
+                                }
+                            },
+                            Err(e) => {
+                                error!("Failed to receive response: {}", e);
                                 break;
                             }
                         }
-                        Err(e) => {
-                            eprintln!("Failed to serialize response: {}", e);
-                            break;
-                        }
-                    },
+                    }
                     Err(e) => {
-                        eprintln!("Failed to receive response: {}", e);
+                        error!("Failed to deserialize request: {}", e);
                         break;
                     }
                 }
             }
             Err(e) => {
-                eprintln!("Failed to deserialize request: {}", e);
-                break;
+                if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                    debug!("Client disconnected");
+                } else {
+                    error!("Error reading length prefix: {}", e);
+                }
             }
         }
     }

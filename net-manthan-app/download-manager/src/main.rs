@@ -50,7 +50,7 @@ async fn main() {
         }
     };
 
-    let ipc_server_address = format!("{}:{}", config.ipc_server_address, config.ipc_server_port);
+    let ipc_server_address = config.get_ipc_server_address();
     // TODO: add an ipc secret or signing thing for security purposes (Supreme Leader Laughs)
     // we are two months away from enriching weapons grade uranium... to be used for IPC communication only
     let (ipc_response_sender, ipc_request_receiver) = match start_ipc_server(&ipc_server_address) {

@@ -1,10 +1,13 @@
 use std::path::PathBuf;
 
 use chrome_native_messaging::event_loop;
-use download_engine::types::{IpcRequest, IpcResponse};
+use download_engine::{
+    config::NetManthanConfig,
+    types::{IpcRequest, IpcResponse},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use utils::{Client, IPC_SOCKET_ADDRESS};
+use utils::Client;
 
 #[derive(Serialize)]
 struct ResponseToExtension {
@@ -21,14 +24,22 @@ pub struct DownloadRequest {
 }
 
 fn main() {
+    let config = match NetManthanConfig::load_config(PathBuf::from("./.dev/config.toml")) {
+        Ok(config) => config,
+        Err(_) => NetManthanConfig::get_default_config(),
+    };
+
     event_loop(|value| match value {
         Value::Null => Err("null payload"),
         Value::Object(request) => {
-            let mut client = match Client::new(IPC_SOCKET_ADDRESS) {
+            let mut client = match Client::new(&config.get_ipc_server_address()) {
                 Ok(client) => client,
                 Err(_) => {
                     return Ok(ResponseToExtension {
-                        payload: "Could not connect to the server".to_string(),
+                        payload: format!(
+                            "Could not connect to the server at {}",
+                            config.ipc_server_address
+                        ),
                     });
                 }
             };
@@ -53,10 +64,10 @@ fn main() {
                 Ok(response) => {
                     return match response {
                         IpcResponse::Success => Ok(ResponseToExtension {
-                            payload: "Download Started".to_string(),
+                            payload: "Download Started!!!".to_string(),
                         }),
                         _ => Ok(ResponseToExtension {
-                            payload: "Something went wrong".to_string(),
+                            payload: "Some invalide response from the server".to_string(),
                         }),
                     };
                 }

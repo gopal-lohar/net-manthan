@@ -3,7 +3,6 @@ use download_engine::types::{IpcRequest, IpcResponse};
 use std::io::prelude::*;
 use std::net::TcpStream;
 
-pub const IPC_SOCKET_ADDRESS: &str = "127.0.0.1:8080";
 pub mod logging;
 
 pub struct Client {

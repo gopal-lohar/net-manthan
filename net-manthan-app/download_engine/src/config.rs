@@ -68,4 +68,8 @@ impl NetManthanConfig {
 
         Ok(())
     }
+
+    pub fn get_ipc_server_address(&self) -> String {
+        format!("{}:{}", self.ipc_server_address, self.ipc_server_port)
+    }
 }
