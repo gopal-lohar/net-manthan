@@ -1,4 +1,7 @@
+mod components;
+
 use async_std::task::sleep;
+use components::Dialog;
 use dioxus::prelude::*;
 use download_engine::{
     config::NetManthanConfig,
@@ -12,6 +15,7 @@ use utils::Client;
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 const PREFLIGHT_CSS: Asset = asset!("/assets/preflight.css");
 const UTILS_CSS: Asset = asset!("/assets/utils.css");
+const DIALOG_CSS: Asset = asset!("/assets/dialog.css");
 
 fn main() {
     dioxus::launch(App);
@@ -76,18 +80,36 @@ fn App() -> Element {
         document::Link { rel: "stylesheet", href: MAIN_CSS }
         document::Link { rel: "stylesheet", href: PREFLIGHT_CSS }
         document::Link { rel: "stylesheet", href: UTILS_CSS }
+        document::Link { rel: "stylesheet", href: DIALOG_CSS }
         Container {
+            client: client.clone(),
             downloads: downloads.read().clone()
         }
     }
 }
 
 #[component]
-pub fn Container(downloads: Vec<Download>) -> Element {
+pub fn Container(downloads: Vec<Download>, client: Signal<Option<Client>>) -> Element {
+    let show_dialog = use_signal(|| false);
     rsx! {
         div { class: "container",
-            h1 { "Download Manager" }
+            TopBar {
+                show_dialog: show_dialog.clone()
+            }
             DownloadList { downloads: downloads }
+            if *show_dialog.read() == true {
+                Dialog {client: client.clone(), show_dialog}
+            }
+        }
+    }
+}
+
+#[component]
+pub fn TopBar(show_dialog: Signal<bool>) -> Element {
+    rsx! {
+        div { class: "top-bar flex justify-between",
+            h1 {"Active Downloads"},
+            button {class: "download-dialog-button flex items-center justify-center", onclick: move |_| *show_dialog.write() = true, "+" }
         }
     }
 }

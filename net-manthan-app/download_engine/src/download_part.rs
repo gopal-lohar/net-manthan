@@ -15,7 +15,6 @@ use std::{
         Arc,
     },
 };
-use tracing::info;
 
 fn open_download_file(
     filepath: PathBuf,

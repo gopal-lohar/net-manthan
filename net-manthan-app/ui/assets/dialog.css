@@ -1,0 +1,51 @@
+.dialog-root {
+    position: fixed;
+    inset: 0;
+    background-color: hsl(0, 0%, 0%, 0.25);
+    z-index: 4444;
+    isolation: isolate;
+}
+
+.dialog-content {
+    width: 30rem;
+    background-color: white;
+    min-height: 20rem;
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.dialog-header {
+    border-bottom: 1px solid hsl(225, 50%, 90%);
+    font-weight: bold;
+    color: hsl(225, 50%, 50%);
+    height: 3rem;
+    position: relative;
+}
+
+.dialog-body {
+    padding: 1rem;
+}
+
+.url-input {
+    padding: 0.25rem 0.5rem;
+    border: 2px solid hsl(225, 50%, 90%);
+    width: 100%;
+    border-radius: 0.25rem;
+}
+
+.url-input:focus {
+    border-color: hsl(225, 100%, 75%);
+    outline: transparent;
+}
+
+.dialog-buttons {
+    padding-block: 1rem;
+}
+
+.dialog-buttons button {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    background-color: hsl(210, 100%, 75%);
+}
