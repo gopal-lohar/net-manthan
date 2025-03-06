@@ -25,7 +25,7 @@ pub mod progress_aggregator;
 pub mod types;
 
 /// Represents a download in the database
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Download {
     pub download_id: String,
     pub filename: String,
@@ -45,7 +45,7 @@ pub struct Download {
 }
 
 /// Represents a part of a download in the database
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DownloadPart {
     pub download_id: String,
     pub part_id: String,

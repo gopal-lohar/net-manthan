@@ -5,7 +5,7 @@ members = [
     "download-manager",
     "native-message-host",
     "download_engine",
-    "utils",
+    "utils", "ui",
 ]
 
 [workspace.dependencies]
@@ -26,3 +26,15 @@ toml = "0.8.20"
 futures-util = "0.3.31"
 crossbeam-channel = "0.5.14"
 tracing-appender = "0.2.3"
+
+[profile]
+
+[profile.wasm-dev]
+inherits = "dev"
+opt-level = 1
+
+[profile.server-dev]
+inherits = "dev"
+
+[profile.android-dev]
+inherits = "dev"

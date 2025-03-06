@@ -4,7 +4,7 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct NetManthanConfig {
     pub auto_resume: bool,
     pub thread_count: u8,
