@@ -13,6 +13,7 @@ mod ipc_server;
 
 #[tokio::main]
 async fn main() {
+    // TODO: download failed if the downloads folder does not exist (create it or gracefully handle it)
     let config = match NetManthanConfig::load_config(PathBuf::from("./.dev/config.toml")) {
         Ok(config) => config,
         Err(e) => {

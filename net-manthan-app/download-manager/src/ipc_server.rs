@@ -7,6 +7,7 @@ use std::net::{TcpListener, TcpStream};
 use std::thread;
 use tracing::{debug, error, info};
 
+// TODO: use tokio tasks
 // TODO: this has some race conditions going on but who cares?
 pub fn start_ipc_server(address: &String) -> Result<(Sender<IpcResponse>, Receiver<IpcRequest>)> {
     let (ipc_request_sender, ipc_request_receiver) = bounded::<IpcRequest>(100);

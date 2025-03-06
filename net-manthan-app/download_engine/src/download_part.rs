@@ -15,6 +15,7 @@ use std::{
         Arc,
     },
 };
+use tracing::info;
 
 fn open_download_file(
     filepath: PathBuf,
@@ -121,11 +122,12 @@ pub async fn download_part(
                 if elapsed >= update_interval {
                     speed_in_bytes =
                         ((bytes_downloaded_last as f64) / elapsed.num_seconds() as f64) as u64;
+                    // TODO: sync this with the bufwriter, somehow
                     bytes_downloaded += bytes_downloaded_last;
                     bytes_downloaded_last = 0;
                     last_update_time = Utc::now();
 
-                    // fix by not sending empty string
+                    // TODO: fix by not sending empty string
                     let progress = PartProgress {
                         download_id: "".to_string(),
                         part_id: part_id.clone(),
