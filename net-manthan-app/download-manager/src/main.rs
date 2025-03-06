@@ -4,7 +4,7 @@ use download_db_manager::connect_to_database;
 use download_engine::config::NetManthanConfig;
 use download_manager::DownloadManager;
 use ipc_server::start_ipc_server;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use utils::logging;
 
 pub mod download_db_manager;
@@ -64,6 +64,10 @@ async fn main() {
         }
     };
 
-    let download_manager = DownloadManager::new(all_downloads, config);
-    download_manager.start(ipc_response_sender, ipc_request_receiver);
+    info!("ALL DOWNLOADS: {:?}", all_downloads);
+
+    let mut download_manager = DownloadManager::new(db_manager, all_downloads, config);
+    download_manager
+        .start(ipc_response_sender, ipc_request_receiver)
+        .await;
 }
