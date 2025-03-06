@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+
 use crossbeam_channel::{bounded, select, Receiver, Sender};
 use download_engine::types::{DownloadRequest, PartProgress};
 use download_engine::Download;
@@ -15,6 +19,7 @@ pub struct DownloadManager {
     pub all_downloads: Vec<Download>,
     pub aggregator_sender: Sender<Vec<PartProgress>>,
     pub aggregator_receiver: Receiver<Vec<PartProgress>>,
+    pub active_download: HashMap<String, Arc<AtomicBool>>,
 }
 
 impl DownloadManager {
@@ -30,6 +35,7 @@ impl DownloadManager {
             all_downloads,
             aggregator_sender,
             aggregator_receiver,
+            active_download: HashMap::new(),
         }
     }
 
@@ -88,6 +94,16 @@ impl DownloadManager {
                 let downloads = self.all_downloads.clone();
                 IpcResponse::DownloadsList(downloads)
             }
+            IpcRequest::GetActiveDownloads {} => {
+                let active_ids: Vec<&String> = self.active_download.keys().collect();
+                let active_downloads = self
+                    .all_downloads
+                    .iter()
+                    .filter(|download| active_ids.contains(&&download.download_id))
+                    .cloned()
+                    .collect();
+                IpcResponse::DownloadsList(active_downloads)
+            }
             IpcRequest::StartDownload {
                 url,
                 output_path,
@@ -114,7 +130,11 @@ impl DownloadManager {
                             download.start(self.aggregator_sender.clone(), self.config.clone());
                         self.all_downloads.push(download.clone());
                         match self.db_manager.insert_download(&mut download) {
-                            Ok(id) => IpcResponse::Success {},
+                            Ok(_) => {
+                                self.active_download
+                                    .insert(download.download_id, cancel_handle);
+                                IpcResponse::Success {}
+                            }
                             Err(err) => IpcResponse::Error(err.to_string()),
                         }
                     }
@@ -131,6 +151,7 @@ impl DownloadManager {
     }
 
     pub fn handle_progress_update(&mut self, progress_vec: Vec<PartProgress>) {
+        // TODO: close download threads after it's done
         if let Some(download_index) = self
             .all_downloads
             .iter()

@@ -55,16 +55,6 @@ pub struct DownloadPart {
     pub bytes_downloaded: u64,
 }
 
-// fn create_download_file(filepath: &PathBuf, size: u64) -> Result<(), DownloadError> {
-//     match OpenOptions::new().create(true).write(true).open(filepath) {
-//         Ok(handle) => match handle.set_len(size) {
-//             Ok(_) => Ok(()),
-//             Err(err) => Err(DownloadError::FileSystemError(err)),
-//         },
-//         Err(err) => Err(DownloadError::FileSystemError(err)),
-//     }
-// }
-
 fn create_download_file(filepath: &PathBuf, size: u64) -> Result<(), DownloadError> {
     let mut path = filepath.clone();
     if path.exists() {

@@ -35,6 +35,7 @@ pub enum IpcRequest {
         detailed: bool,
         limit: Option<usize>,
     },
+    GetActiveDownloads {},
     StartDownload {
         url: String,
         output_path: Option<PathBuf>,
