@@ -182,6 +182,7 @@ impl Download {
                 .parts
                 .iter()
                 .map(|part| PartProgress {
+                    download_id: self.download_id.clone(),
                     part_id: part.part_id.clone(),
                     bytes_downloaded: part.bytes_downloaded,
                     total_bytes: part.total_bytes,

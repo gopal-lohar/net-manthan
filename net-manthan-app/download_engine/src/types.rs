@@ -17,6 +17,7 @@ pub struct DownloadRequest {
 /// (the aggregator thread just sends a vector of these)
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PartProgress {
+    pub download_id: String,
     pub part_id: String,
     pub bytes_downloaded: u64,
     pub total_bytes: u64,

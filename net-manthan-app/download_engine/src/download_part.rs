@@ -33,16 +33,6 @@ fn open_download_file(
     Ok(file_writer)
 }
 
-/*
-part_id,
-range,
-part.bytes_downloaded,
-file_path.clone(),
-config,
-progress_sender.clone(),
-cancel_token,
-*/
-
 pub async fn download_part(
     url: String,
     headers: Option<Vec<String>>,
@@ -135,7 +125,9 @@ pub async fn download_part(
                     bytes_downloaded_last = 0;
                     last_update_time = Utc::now();
 
+                    // fix by not sending empty string
                     let progress = PartProgress {
+                        download_id: "".to_string(),
                         part_id: part_id.clone(),
                         bytes_downloaded,
                         total_bytes: download_size,
@@ -163,6 +155,7 @@ pub async fn download_part(
 
     bytes_downloaded += bytes_downloaded_last;
     let progress = PartProgress {
+        download_id: "".to_string(),
         part_id,
         bytes_downloaded,
         total_bytes: download_size,

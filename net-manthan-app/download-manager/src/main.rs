@@ -64,7 +64,18 @@ async fn main() {
         }
     };
 
-    info!("ALL DOWNLOADS: {:?}", all_downloads);
+    let mut i = 0;
+    for download in &all_downloads {
+        debug!("{}. Download: {}", i + 1, download.filename);
+        for part in &download.parts {
+            debug!(
+                "Part: {}KB/{}KB",
+                part.bytes_downloaded / 1024,
+                part.total_bytes / 1024
+            );
+        }
+        i += 1;
+    }
 
     let mut download_manager = DownloadManager::new(db_manager, all_downloads, config);
     download_manager
