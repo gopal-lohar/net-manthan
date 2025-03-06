@@ -10,14 +10,31 @@ use std::time::Duration;
 use utils::Client;
 
 const MAIN_CSS: Asset = asset!("/assets/main.css");
+const PREFLIGHT_CSS: Asset = asset!("/assets/preflight.css");
+const UTILS_CSS: Asset = asset!("/assets/utils.css");
 
 fn main() {
     dioxus::launch(App);
 }
 
+pub fn format_bytes(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+
+    if bytes < KB {
+        format!("{} B", bytes)
+    } else if bytes < MB {
+        format!("{:.2} KB", bytes as f64 / KB as f64)
+    } else if bytes < GB {
+        format!("{:.2} MB", bytes as f64 / MB as f64)
+    } else {
+        format!("{:.2} GB", bytes as f64 / GB as f64)
+    }
+}
+
 #[component]
 fn App() -> Element {
-    // Create state to store downloads
     let mut downloads = use_signal(Vec::<Download>::new);
 
     // Set up config locally
@@ -48,33 +65,17 @@ fn App() -> Element {
         }
     };
 
-    let mut should_fetch = use_signal(|| true);
-    use_effect(move || {
-        if !*should_fetch.read() {
-            return;
-        }
-
-        // Reset the flag
-        should_fetch.set(false);
-
-        // Fetch downloads
-        fetch_downloads();
-
-        // Schedule the next fetch
-        let mut should_fetch_clone = should_fetch.clone();
-        spawn(async move {
+    use_future(move || async move {
+        loop {
+            fetch_downloads();
             sleep(Duration::from_millis(500)).await;
-            should_fetch_clone.set(true);
-        });
-    });
-
-    // Initial fetch on component mount
-    use_effect(move || {
-        fetch_downloads();
+        }
     });
 
     rsx! {
         document::Link { rel: "stylesheet", href: MAIN_CSS }
+        document::Link { rel: "stylesheet", href: PREFLIGHT_CSS }
+        document::Link { rel: "stylesheet", href: UTILS_CSS }
         Container {
             downloads: downloads.read().clone()
         }
@@ -110,9 +111,21 @@ pub fn DownloadList(downloads: Vec<Download>) -> Element {
 
 #[component]
 pub fn DownloadItem(download: Download) -> Element {
+    let total: u64 = download.parts.iter().map(|p| p.total_bytes).sum();
+    let downloaded: u64 = download.parts.iter().map(|p| p.bytes_downloaded).sum();
+    let progress = if total > 0 {
+        (downloaded as f64 / total as f64) * 100.0
+    } else {
+        0.0
+    };
     rsx! {
-        div { class: "download-item",
+        div { class: "download-item flex flex-column",
             div { class: "download-name", "{download.filename}" }
+            div { class: "progress-bar", "data-progress": "70%", style: "--progress: {progress}%"}
+            div { class: "flex items-center justify-between",
+                div{"{format_bytes(downloaded)}/{format_bytes(total)}"},
+                div{"{progress:.2}%"}
+            }
         }
     }
 }

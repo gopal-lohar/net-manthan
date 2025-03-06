@@ -1,0 +1,43 @@
+:root {
+    --transition-duration: 250ms;
+}
+
+.download-list {
+    max-width: 75rem;
+    margin-inline: auto;
+    padding-inline: 0.5rem;
+}
+
+.download-item {
+    padding: 1rem;
+    border-radius: 0.25rem;
+    border: 1px solid hsl(225, 50%, 75%);
+    margin-top: 1rem;
+    gap: 0.5rem;
+    transition: border-color var(--transition-duration) ease;
+}
+
+.download-item:hover {
+    border-color: hsl(255, 50%, 75%);
+}
+
+.progress-bar {
+    --progress: 100%;
+    background: hsl(225, 50%, 95%);
+    width: 100%;
+    height: 0.5rem;
+    border-radius: 9999px;
+    position: relative;
+}
+
+.progress-bar::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--progress);
+    height: 100%;
+    background: hsl(220, 75%, 75%);
+    border-radius: 9999px;
+    transition: width var(--transition-duration) ease;
+}
