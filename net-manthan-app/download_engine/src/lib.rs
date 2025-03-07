@@ -96,6 +96,18 @@ fn get_download_parts(
     download_info: &DownloadInfo,
 ) -> Vec<DownloadPart> {
     let mut parts = Vec::<DownloadPart>::new();
+    if thread_count == 1 || download_info.resume == false {
+        parts.push(DownloadPart {
+            download_id: download_id.clone(),
+            part_id: Uuid::new_v4().to_string(),
+            start_bytes: 0,
+            end_bytes: download_info.size - 1,
+            total_bytes: download_info.size,
+            bytes_downloaded: 0,
+        });
+        return parts;
+    }
+
     let part_size = download_info.size as f64 / thread_count as f64;
     for i in 0..thread_count {
         let part = DownloadPart {
@@ -197,10 +209,11 @@ impl Download {
         }) * 1024;
 
         for part in &self.parts {
-            // let config = Arc::clone(&config);
             let cancel_token = cancel_token.clone();
-            let range = if self.resumable {
+            let range = if self.resumable && self.parts.len() > 1 {
                 Some((part.start_bytes, part.end_bytes))
+            } else if self.resumable == false && self.parts.len() == 1 {
+                None
             } else {
                 None
             };
