@@ -10,6 +10,7 @@ use download_engine::{
 };
 use std::path::PathBuf;
 use std::time::Duration;
+use utils::format_bytes;
 use utils::Client;
 
 const MAIN_CSS: Asset = asset!("/assets/main.css");
@@ -19,22 +20,6 @@ const DIALOG_CSS: Asset = asset!("/assets/dialog.css");
 
 fn main() {
     dioxus::launch(App);
-}
-
-pub fn format_bytes(bytes: u64) -> String {
-    const KB: u64 = 1024;
-    const MB: u64 = KB * 1024;
-    const GB: u64 = MB * 1024;
-
-    if bytes < KB {
-        format!("{} B", bytes)
-    } else if bytes < MB {
-        format!("{:.2} KB", bytes as f64 / KB as f64)
-    } else if bytes < GB {
-        format!("{:.2} MB", bytes as f64 / MB as f64)
-    } else {
-        format!("{:.2} GB", bytes as f64 / GB as f64)
-    }
 }
 
 #[component]
@@ -114,10 +99,42 @@ pub fn TopBar(show_dialog: Signal<bool>) -> Element {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Tab {
+    Active,
+    Finished,
+    Paused,
+    Failed,
+}
+
 #[component]
 pub fn DownloadList(downloads: Vec<Download>) -> Element {
+    let mut active_tab = use_signal(|| Tab::Active);
+
     rsx! {
         div { class: "download-list",
+            div { class: "tab-button-wrapper",
+                button {
+                    class: format!("tab-button {}",  {if *active_tab.read() == Tab::Active { "active" } else { "" }}),
+                    onclick: move |_| active_tab.set(Tab::Active),
+                    "Active"
+                }
+                button {
+                    class: format!("tab-button {}",  {if *active_tab.read() == Tab::Finished { "active" } else { "" }}),
+                    onclick: move |_| active_tab.set(Tab::Finished),
+                    "Finished"
+                }
+                button {
+                    class: format!("tab-button {}",  {if *active_tab.read() == Tab::Paused { "active" } else { "" }}),
+                    onclick: move |_| active_tab.set(Tab::Paused),
+                    "Paused"
+                }
+                button {
+                    class: format!("tab-button {}",  {if *active_tab.read() == Tab::Failed { "active" } else { "" }}),
+                    onclick: move |_| active_tab.set(Tab::Failed),
+                    "Failed"
+                }
+            },
             if downloads.is_empty() {
                 div { class: "no-downloads", "No active downloads" }
             } else {

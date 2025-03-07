@@ -55,3 +55,25 @@
     color: white;
     background: hsl(200, 100%, 50%);
 }
+
+.tab-button-wrapper {
+    padding: 0.25rem;
+    background-color: hsl(225, 25%, 90%);
+    border-radius: 9999rem;
+    width: max-content;
+    margin-inline: auto;
+}
+
+.tab-button {
+    padding: 0.5rem 1rem;
+    border-radius: 9999rem;
+    background-color: transparent;
+}
+
+.tab-button:hover {
+    background-color: hsl(225, 25%, 95%);
+}
+
+.active {
+    background: white;
+}

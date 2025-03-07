@@ -36,3 +36,19 @@ impl Client {
         bincode::deserialize(&buffer).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
 }
+
+pub fn format_bytes(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+
+    if bytes < KB {
+        format!("{} B", bytes)
+    } else if bytes < MB {
+        format!("{:.2} KB", bytes as f64 / KB as f64)
+    } else if bytes < GB {
+        format!("{:.2} MB", bytes as f64 / MB as f64)
+    } else {
+        format!("{:.2} GB", bytes as f64 / GB as f64)
+    }
+}
