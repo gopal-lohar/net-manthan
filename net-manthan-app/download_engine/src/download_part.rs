@@ -3,7 +3,6 @@ use crate::{
     types::{DownloadStatus, PartProgress},
 };
 use chrono::{Duration, Utc};
-use crossbeam_channel::Sender;
 use futures_util::StreamExt;
 use reqwest::{
     header::{self, HeaderMap, HeaderName, HeaderValue},
@@ -18,6 +17,7 @@ use std::{
         Arc,
     },
 };
+use tokio::sync::Mutex;
 
 fn open_download_file(
     filepath: PathBuf,
@@ -36,15 +36,15 @@ fn open_download_file(
     Ok(file_writer)
 }
 
+// TODO: it is ran in a tokio::task so doesn't mean anything by returning error for now (SO DON'T)
 pub async fn download_part(
     url: String,
     headers: Option<Vec<String>>,
-    part_id: String,
     range: Option<(u64, u64)>,
     mut bytes_downloaded: u64,
     filepath: PathBuf,
     buffer_size: u64,
-    progress_sender: Sender<PartProgress>,
+    progress: Arc<Mutex<PartProgress>>,
     update_interval: Duration,
     cancel_token: Arc<AtomicBool>,
 ) -> Result<(), DownloadError> {
@@ -122,16 +122,14 @@ pub async fn download_part(
                     bytes_downloaded_last = 0;
                     last_update_time = Utc::now();
 
-                    let progress = PartProgress {
-                        part_id: part_id.clone(),
-                        bytes_downloaded,
-                        speed_in_bytes,
-                        status: DownloadStatus::Downloading,
-                    };
+                    // update progress
+                    let mut progress_unlocked = progress.lock().await;
+                    progress_unlocked.bytes_downloaded = bytes_downloaded;
+                    progress_unlocked.speed_in_bytes = speed_in_bytes;
+                    progress_unlocked.status = DownloadStatus::Downloading;
 
-                    if progress_sender.send(progress).is_err()
-                        || cancel_token.load(Ordering::Relaxed)
-                    {
+                    if cancel_token.load(Ordering::Relaxed) {
+                        // TODO: handle cancellation properly
                         break;
                     }
                 }
@@ -147,16 +145,11 @@ pub async fn download_part(
         .map_err(DownloadError::from_write_error)?;
 
     bytes_downloaded += bytes_downloaded_last;
-    let progress = PartProgress {
-        part_id,
-        bytes_downloaded,
-        speed_in_bytes,
-        status: DownloadStatus::Completed(Utc::now()),
-    };
-    match progress_sender.send(progress) {
-        Ok(_) => {}
-        Err(_) => {}
-    }
 
+    // update progress
+    let mut progress_unlocked = progress.lock().await;
+    progress_unlocked.bytes_downloaded = bytes_downloaded;
+    progress_unlocked.speed_in_bytes = speed_in_bytes;
+    progress_unlocked.status = DownloadStatus::Completed(Utc::now());
     Ok(())
 }

@@ -4,7 +4,6 @@ use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
 use config::NetManthanConfig;
-use crossbeam_channel::bounded;
 use crossbeam_channel::Sender;
 use download_part::download_part;
 use errors::DownloadError;
@@ -15,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::{atomic::AtomicBool, Arc};
+use tokio::sync::Mutex;
 use types::DownloadStatus;
 use uuid::Uuid;
 
@@ -172,39 +172,20 @@ impl Download {
         })
     }
 
-    pub fn start(
+    pub async fn start(
         &self,
         aggregator_sender: Sender<Vec<PartProgress>>,
         config: NetManthanConfig,
-    ) -> Arc<AtomicBool> {
-        let cancel_token = Arc::new(AtomicBool::new(false));
-        let config = Arc::new(config);
-        let (progress_sender, progress_receiver) = bounded::<PartProgress>(100);
-        {
-            let initial_progress = self
-                .parts
-                .iter()
-                .map(|part| PartProgress {
-                    part_id: part.part_id.clone(),
-                    bytes_downloaded: part.bytes_downloaded,
-                    speed_in_bytes: self.average_speed,
-                    status: DownloadStatus::Connecting,
-                })
-                .collect::<Vec<PartProgress>>();
-            tokio::spawn(progress_aggregator(
-                initial_progress,
-                progress_receiver,
-                aggregator_sender.clone(),
-                chrono::Duration::milliseconds(config.update_interval_in_ms),
-                Arc::clone(&cancel_token),
-            ));
-        }
-
+        cancel_token: Arc<AtomicBool>,
+    ) {
+        let update_interval = Duration::milliseconds(config.update_interval_in_ms);
         let buffer_size = (if self.parts.len() > 1 {
             config.multi_threaded_buffer_size_in_kb
         } else {
             config.single_threaded_buffer_size_in_kb
         }) * 1024;
+
+        let mut part_progress_vec = Vec::with_capacity(self.parts.len());
 
         for part in &self.parts {
             let cancel_token = cancel_token.clone();
@@ -216,21 +197,33 @@ impl Download {
                 None
             };
 
-            let part_id = part.part_id.clone();
+            let progress = Arc::new(Mutex::new(PartProgress {
+                part_id: part.part_id.clone(),
+                bytes_downloaded: part.bytes_downloaded,
+                speed_in_bytes: 0,
+                status: DownloadStatus::Connecting,
+            }));
+
+            part_progress_vec.push(progress.clone());
+
             tokio::spawn(download_part(
                 self.download_link.clone(),
                 None, // TODO: Implement headers, both while checking the download and while downloading
-                part_id,
                 range,
                 part.bytes_downloaded,
                 PathBuf::from(self.path.clone()),
                 buffer_size,
-                progress_sender.clone(),
+                progress,
                 Duration::milliseconds(config.update_interval_in_ms),
                 cancel_token,
             ));
         }
 
-        return cancel_token;
+        tokio::spawn(progress_aggregator(
+            part_progress_vec,
+            aggregator_sender,
+            update_interval,
+            cancel_token,
+        ));
     }
 }

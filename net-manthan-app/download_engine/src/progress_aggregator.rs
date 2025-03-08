@@ -1,41 +1,51 @@
-use crate::types::PartProgress;
+use crate::types::{DownloadStatus, PartProgress};
 use chrono::{Duration, Utc};
-use crossbeam_channel::{Receiver, Sender};
-use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::Duration as StdDuration,
+use crossbeam_channel::Sender;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
 };
+use tokio::sync::Mutex;
 
-// TODO: close this thread when the download is complete
 pub async fn progress_aggregator(
-    mut download_progress: Vec<PartProgress>,
-    progress_receiver: Receiver<PartProgress>,
+    part_progress_vec: Vec<Arc<Mutex<PartProgress>>>,
     aggregator_sender: Sender<Vec<PartProgress>>,
-    udpate_interval: Duration,
+    update_interval: Duration,
     cancel_token: Arc<AtomicBool>,
 ) {
     let mut last_update = Utc::now();
 
     while !cancel_token.load(Ordering::Relaxed) {
-        match progress_receiver.recv_timeout(StdDuration::from_millis(100)) {
-            Ok(part_progress) => {
-                let part_id = part_progress.part_id.clone();
-                if let Some(x) = download_progress.iter_mut().find(|x| x.part_id == part_id) {
-                    *x = part_progress;
-                }
-            }
-            Err(_) => {}
-        }
-
-        if (Utc::now() - last_update).num_milliseconds() > udpate_interval.num_milliseconds() as i64
-        {
-            if aggregator_sender.send(download_progress.clone()).is_err() {
+        if (Utc::now() - last_update) > update_interval {
+            let mut exit_thread = true;
+            if aggregator_sender
+                .send({
+                    let mut vec = Vec::new();
+                    for part in &part_progress_vec {
+                        let guard = part.lock().await;
+                        let something_going_on = match guard.status {
+                            DownloadStatus::Queued => true,
+                            DownloadStatus::Connecting => true,
+                            DownloadStatus::Downloading => true,
+                            DownloadStatus::Paused => false,
+                            DownloadStatus::Completed(_) => false,
+                            DownloadStatus::Failed(_) => false,
+                            DownloadStatus::Cancelled => false,
+                        };
+                        if something_going_on {
+                            exit_thread = false;
+                        }
+                        vec.push(guard.clone());
+                    }
+                    vec
+                })
+                .is_err()
+                || exit_thread
+            {
                 break;
+            } else {
+                last_update = Utc::now();
             }
-            last_update = Utc::now();
         }
     }
 }

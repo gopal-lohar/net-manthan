@@ -9,7 +9,7 @@ use download_engine::{
     config::NetManthanConfig,
     types::{IpcRequest, IpcResponse},
 };
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use crate::download_db_manager::DatabaseManager;
 
@@ -126,8 +126,16 @@ impl DownloadManager {
                 .await
                 {
                     Ok(mut download) => {
-                        let cancel_handle =
-                            download.start(self.aggregator_sender.clone(), self.config.clone());
+                        let cancel_handle = Arc::new(AtomicBool::new(false));
+                        info!("Starting download");
+                        download
+                            .start(
+                                self.aggregator_sender.clone(),
+                                self.config.clone(),
+                                cancel_handle.clone(),
+                            )
+                            .await;
+                        info!("Download started");
                         self.all_downloads.push(download.clone());
                         match self.db_manager.insert_download(&mut download) {
                             Ok(_) => {
