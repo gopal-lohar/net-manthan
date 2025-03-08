@@ -1,7 +1,7 @@
 mod components;
 
 use async_std::task::sleep;
-use components::Dialog;
+use components::{Dialog, Sidebar};
 use dioxus::prelude::*;
 use download_engine::{
     config::NetManthanConfig,
@@ -17,6 +17,7 @@ const MAIN_CSS: Asset = asset!("/assets/main.css");
 const PREFLIGHT_CSS: Asset = asset!("/assets/preflight.css");
 const UTILS_CSS: Asset = asset!("/assets/utils.css");
 const DIALOG_CSS: Asset = asset!("/assets/dialog.css");
+const SIDEBAR_CSS: Asset = asset!("/assets/sidebar.css");
 
 fn main() {
     dioxus::launch(App);
@@ -66,24 +67,30 @@ fn App() -> Element {
         document::Link { rel: "stylesheet", href: PREFLIGHT_CSS }
         document::Link { rel: "stylesheet", href: UTILS_CSS }
         document::Link { rel: "stylesheet", href: DIALOG_CSS }
-        Container {
-            client: client.clone(),
-            downloads: downloads.read().clone()
+        document::Link { rel: "stylesheet", href: SIDEBAR_CSS }
+        div { class: "app",
+            Sidebar{},
+            MainContainer {
+                client: client.clone(),
+                downloads: downloads.read().clone()
+            }
         }
     }
 }
 
 #[component]
-pub fn Container(downloads: Vec<Download>, client: Signal<Option<Client>>) -> Element {
+pub fn MainContainer(downloads: Vec<Download>, client: Signal<Option<Client>>) -> Element {
     let show_dialog = use_signal(|| false);
     rsx! {
-        div { class: "container",
-            TopBar {
-                show_dialog: show_dialog.clone()
-            }
-            DownloadList { downloads: downloads }
-            if *show_dialog.read() == true {
-                Dialog {client: client.clone(), show_dialog}
+        div { class: "main-container",
+            div { class: "container",
+                TopBar {
+                    show_dialog: show_dialog.clone()
+                }
+                DownloadList { downloads: downloads }
+                if *show_dialog.read() == true {
+                    Dialog {client: client.clone(), show_dialog}
+                }
             }
         }
     }
@@ -109,32 +116,8 @@ enum Tab {
 
 #[component]
 pub fn DownloadList(downloads: Vec<Download>) -> Element {
-    let mut active_tab = use_signal(|| Tab::Active);
-
     rsx! {
         div { class: "download-list",
-            div { class: "tab-button-wrapper",
-                button {
-                    class: format!("tab-button {}",  {if *active_tab.read() == Tab::Active { "active" } else { "" }}),
-                    onclick: move |_| active_tab.set(Tab::Active),
-                    "Active"
-                }
-                button {
-                    class: format!("tab-button {}",  {if *active_tab.read() == Tab::Finished { "active" } else { "" }}),
-                    onclick: move |_| active_tab.set(Tab::Finished),
-                    "Finished"
-                }
-                button {
-                    class: format!("tab-button {}",  {if *active_tab.read() == Tab::Paused { "active" } else { "" }}),
-                    onclick: move |_| active_tab.set(Tab::Paused),
-                    "Paused"
-                }
-                button {
-                    class: format!("tab-button {}",  {if *active_tab.read() == Tab::Failed { "active" } else { "" }}),
-                    onclick: move |_| active_tab.set(Tab::Failed),
-                    "Failed"
-                }
-            },
             if downloads.is_empty() {
                 div { class: "no-downloads", "No active downloads" }
             } else {

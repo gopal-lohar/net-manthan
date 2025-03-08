@@ -1,0 +1,32 @@
+.sidebar {
+    width: 15rem;
+    flex-shrink: 0;
+    padding: 1rem;
+    border-right: 1px solid hsl(0, 0%, 90%);
+}
+
+.download-options-wrapper,
+.other-options-wrapper {
+    padding-block: 1rem;
+}
+
+.other-options-wrapper {
+    margin-top: auto;
+    border-top: 1px solid hsl(0, 0%, 90%);
+}
+
+.sidebar-button {
+    padding-block: 0.5rem;
+    background: transparent;
+    outline: transparent;
+    border-radius: 0.25rem;
+}
+
+.sidebar-button:hover,
+.sidebar-button:focus-visible {
+    background: hsl(0, 0%, 95%);
+}
+
+.sidebar-button.current-page {
+    background: hsl(0, 0%, 90%);
+}
