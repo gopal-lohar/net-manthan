@@ -23,6 +23,17 @@ pub struct PartProgress {
     pub status: DownloadStatus,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum DownloadStatus {
+    Queued,
+    Connecting,
+    Downloading,
+    Paused,
+    Completed(DateTime<Utc>),
+    Failed(String),
+    Cancelled,
+}
+
 // ----------------- IPC MESSAGES -----------------
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum IpcRequest {
@@ -39,28 +50,7 @@ pub enum IpcRequest {
         thread_count: Option<u8>,
         headers: Option<Vec<String>>,
     },
-    ResumeDownloads {
-        ids: Vec<u64>, // Empty means all
-    },
-    PauseDownloads {
-        ids: Vec<u64>, // Empty means all
-    },
-    RemoveDownloads {
-        ids: Vec<u64>,
-        delete_files: bool,
-    },
-    UpdateDownload {
-        id: u64,
-        new_url: Option<String>,
-        new_output_path: Option<PathBuf>,
-    },
-    WatchDownloads {
-        ids: Vec<u64>, // Empty means all
-        interval_ms: u64,
-        detailed: bool,
-    },
     GetConfig,
-    SetConfig(NetManthanConfig),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -70,15 +60,4 @@ pub enum IpcResponse {
     Error(String),
     DownloadsList(Vec<Download>),
     Config(NetManthanConfig),
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub enum DownloadStatus {
-    Queued,
-    Connecting,
-    Downloading,
-    Paused,
-    Completed(DateTime<Utc>),
-    Failed(String),
-    Cancelled,
 }

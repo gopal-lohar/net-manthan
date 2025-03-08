@@ -145,8 +145,7 @@ impl DownloadManager {
             IpcRequest::GetConfig => {
                 let config = self.config.clone();
                 IpcResponse::Config(config)
-            }
-            _ => IpcResponse::Error("Unsupported IPC request (for now)".to_string()),
+            } // _ => IpcResponse::Error("Unsupported IPC request (for now)".to_string()),
         }
     }
 
