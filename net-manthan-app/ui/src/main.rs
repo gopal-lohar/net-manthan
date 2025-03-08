@@ -1,7 +1,7 @@
 mod components;
 
 use async_std::task::sleep;
-use components::{Dialog, Sidebar};
+use components::{Dialog, DownloadStatus, Pages, Sidebar};
 use dioxus::prelude::*;
 use download_engine::{
     config::NetManthanConfig,
@@ -26,6 +26,7 @@ fn main() {
 #[component]
 fn App() -> Element {
     let mut downloads = use_signal(Vec::<Download>::new);
+    let current_page = use_signal(|| Pages::Downloads { status: None });
 
     // Set up config locally
     let config =
@@ -36,7 +37,7 @@ fn App() -> Element {
             },
         );
 
-    let mut client = use_signal(|| Client::new(&config.read().get_ipc_server_address()).ok());
+    let mut client = use_signal(|| Client::new(&config().get_ipc_server_address()).ok());
 
     // Function to fetch downloads
     let mut fetch_downloads = move || {
@@ -69,26 +70,50 @@ fn App() -> Element {
         document::Link { rel: "stylesheet", href: DIALOG_CSS }
         document::Link { rel: "stylesheet", href: SIDEBAR_CSS }
         div { class: "app",
-            Sidebar{},
-            MainContainer {
-                client: client.clone(),
-                downloads: downloads.read().clone()
+            Sidebar{
+                current_page
+            },
+            match current_page() {
+                Pages::Downloads { status } => {
+                    rsx!{
+                        MainContainer {
+                            status,
+                            client: client.clone(),
+                            downloads: downloads().clone()
+                        }
+                    }
+                }
+                Pages::Settings => {
+                    rsx!{
+                        "Settings"
+                    }
+                }
+                Pages::About => {
+                    rsx!{
+                        "About"
+                    }
+                }
             }
         }
     }
 }
 
 #[component]
-pub fn MainContainer(downloads: Vec<Download>, client: Signal<Option<Client>>) -> Element {
+pub fn MainContainer(
+    status: Option<DownloadStatus>,
+    downloads: Vec<Download>,
+    client: Signal<Option<Client>>,
+) -> Element {
     let show_dialog = use_signal(|| false);
     rsx! {
         div { class: "main-container",
             div { class: "container",
                 TopBar {
+                    status,
                     show_dialog: show_dialog.clone()
                 }
                 DownloadList { downloads: downloads }
-                if *show_dialog.read() == true {
+                if show_dialog() == true {
                     Dialog {client: client.clone(), show_dialog}
                 }
             }
@@ -97,21 +122,23 @@ pub fn MainContainer(downloads: Vec<Download>, client: Signal<Option<Client>>) -
 }
 
 #[component]
-pub fn TopBar(show_dialog: Signal<bool>) -> Element {
+pub fn TopBar(status: Option<DownloadStatus>, show_dialog: Signal<bool>) -> Element {
     rsx! {
-        div { class: "top-bar flex justify-between",
-            h1 {"Active Downloads"},
-            button {class: "download-dialog-button flex items-center justify-center", onclick: move |_| *show_dialog.write() = true, "+" }
+        div { class: "top-bar flex items-center justify-between",
+            h1 {match status {
+                Some(status) => match status {
+                    DownloadStatus::Downloading => "Active",
+                    DownloadStatus::Queued => "Queued",
+                    DownloadStatus::Finished => "Finished",
+                    DownloadStatus::Failed => "Failed",
+                    DownloadStatus::Cancelled => "Cancelled",
+                    DownloadStatus::Paused => "Paused",
+                },
+                None => "All Downloads",
+            }},
+            button {class: "download-dialog-button flex items-center justify-center", onclick: move |_| *show_dialog.write() = true, "" }
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Tab {
-    Active,
-    Finished,
-    Paused,
-    Failed,
 }
 
 #[component]
@@ -119,7 +146,7 @@ pub fn DownloadList(downloads: Vec<Download>) -> Element {
     rsx! {
         div { class: "download-list",
             if downloads.is_empty() {
-                div { class: "no-downloads", "No active downloads" }
+                div { class: "no-downloads flex items-center justify-center", "No active downloads" }
             } else {
                 {downloads.iter().map(|download| {
                     rsx! {
