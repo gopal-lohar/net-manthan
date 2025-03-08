@@ -1,18 +1,9 @@
 use dioxus::prelude::*;
-
-#[derive(Clone, PartialEq)]
-pub enum DownloadStatus {
-    Downloading,
-    Queued,
-    Finished,
-    Failed,
-    Cancelled,
-    Paused,
-}
-
 #[derive(Clone, PartialEq)]
 pub enum Pages {
-    Downloads { status: Option<DownloadStatus> },
+    Downloading,
+    Queued,
+    Stopped,
     Settings,
     About,
 }
@@ -35,39 +26,19 @@ pub fn Sidebar(current_page: Signal<Pages>) -> Element {
             div {
                 class: "download-options-wrapper flex flex-column",
                 button {
-                    class: get_button_class(Pages::Downloads { status: None }),
-                    onclick: move |_| current_page.set(Pages::Downloads { status: None }),
-                    "All Downloads"
+                    class: get_button_class(Pages::Downloading),
+                    onclick: move |_| current_page.set(Pages::Downloading),
+                    "Downloading"
                 }
                 button {
-                    class: get_button_class(Pages::Downloads { status: Some(DownloadStatus::Downloading) }),
-                    onclick: move |_| current_page.set(Pages::Downloads { status: Some(DownloadStatus::Downloading) }),
-                    "Active"
-                }
-                button {
-                    class: get_button_class(Pages::Downloads { status: Some(DownloadStatus::Queued) }),
-                    onclick: move |_| current_page.set(Pages::Downloads { status: Some(DownloadStatus::Queued) }),
+                    class: get_button_class(Pages::Queued),
+                    onclick: move |_| current_page.set(Pages::Queued),
                     "Queued"
                 }
                 button {
-                    class: get_button_class(Pages::Downloads { status: Some(DownloadStatus::Finished) }),
-                    onclick: move |_| current_page.set(Pages::Downloads { status: Some(DownloadStatus::Finished) }),
-                    "Finished"
-                }
-                button {
-                    class: get_button_class(Pages::Downloads { status: Some(DownloadStatus::Failed) }),
-                    onclick: move |_| current_page.set(Pages::Downloads { status: Some(DownloadStatus::Failed) }),
-                    "Failed"
-                }
-                button {
-                    class: get_button_class(Pages::Downloads { status: Some(DownloadStatus::Cancelled) }),
-                    onclick: move |_| current_page.set(Pages::Downloads { status: Some(DownloadStatus::Cancelled) }),
-                    "Cancelled"
-                }
-                button {
-                    class: get_button_class(Pages::Downloads { status: Some(DownloadStatus::Paused) }),
-                    onclick: move |_| current_page.set(Pages::Downloads { status: Some(DownloadStatus::Paused) }),
-                    "Paused"
+                    class: get_button_class(Pages::Stopped),
+                    onclick: move |_| current_page.set(Pages::Stopped),
+                    "Stopped"
                 }
             }
             div {

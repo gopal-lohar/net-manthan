@@ -1,15 +1,16 @@
 mod components;
 
-use async_std::task::sleep;
-use components::{Dialog, DownloadStatus, Pages, Sidebar};
+use chrono::Utc;
+use components::{Dialog, Pages, Sidebar};
 use dioxus::prelude::*;
 use download_engine::{
     config::NetManthanConfig,
-    types::{IpcRequest, IpcResponse},
+    types::{DownloadStatus, IpcRequest, IpcResponse},
     Download,
 };
 use std::path::PathBuf;
 use std::time::Duration;
+use tokio::time::sleep;
 use utils::format_bytes;
 use utils::Client;
 
@@ -25,8 +26,9 @@ fn main() {
 
 #[component]
 fn App() -> Element {
+    let show_dialog = use_signal(|| false);
     let mut downloads = use_signal(Vec::<Download>::new);
-    let current_page = use_signal(|| Pages::Downloads { status: None });
+    let current_page = use_signal(|| Pages::Downloading);
 
     // Set up config locally
     let config =
@@ -42,7 +44,26 @@ fn App() -> Element {
     // Function to fetch downloads
     let mut fetch_downloads = move || {
         if let Some(client) = &mut *client.write() {
-            match client.send_and_receive(IpcRequest::GetActiveDownloads {}) {
+            match client.send_and_receive(IpcRequest::GetDownloads({
+                let mut status_vec = Vec::new();
+                match current_page() {
+                    Pages::Downloading => {
+                        status_vec.push(DownloadStatus::Connecting);
+                        status_vec.push(DownloadStatus::Downloading);
+                    }
+                    Pages::Queued => {
+                        status_vec.push(DownloadStatus::Queued);
+                    }
+                    Pages::Stopped => {
+                        status_vec.push(DownloadStatus::Paused);
+                        status_vec.push(DownloadStatus::Failed(String::new()));
+                        status_vec.push(DownloadStatus::Completed(Utc::now()));
+                        status_vec.push(DownloadStatus::Cancelled);
+                    }
+                    _ => {}
+                }
+                status_vec
+            })) {
                 Ok(IpcResponse::DownloadsList(list)) => {
                     downloads.set(list);
                 }
@@ -73,68 +94,50 @@ fn App() -> Element {
             Sidebar{
                 current_page
             },
-            match current_page() {
-                Pages::Downloads { status } => {
-                    rsx!{
-                        MainContainer {
-                            status,
-                            client: client.clone(),
-                            downloads: downloads().clone()
-                        }
-                    }
-                }
-                Pages::Settings => {
-                    rsx!{
-                        "Settings"
-                    }
-                }
-                Pages::About => {
-                    rsx!{
-                        "About"
-                    }
-                }
-            }
+        MainContainer {
+            current_page,
+            client: client.clone(),
+            downloads: downloads().clone(),
+            show_dialog
+        }
+        if show_dialog() == true {
+            Dialog {client: client.clone(), show_dialog}
+        }
+
         }
     }
 }
 
 #[component]
 pub fn MainContainer(
-    status: Option<DownloadStatus>,
+    current_page: Signal<Pages>,
     downloads: Vec<Download>,
     client: Signal<Option<Client>>,
+    show_dialog: Signal<bool>,
 ) -> Element {
-    let show_dialog = use_signal(|| false);
     rsx! {
         div { class: "main-container",
             div { class: "container",
                 TopBar {
-                    status,
-                    show_dialog: show_dialog.clone()
+                    current_page,
+                    show_dialog
                 }
                 DownloadList { downloads: downloads }
-                if show_dialog() == true {
-                    Dialog {client: client.clone(), show_dialog}
-                }
             }
         }
     }
 }
 
 #[component]
-pub fn TopBar(status: Option<DownloadStatus>, show_dialog: Signal<bool>) -> Element {
+pub fn TopBar(current_page: Signal<Pages>, show_dialog: Signal<bool>) -> Element {
     rsx! {
         div { class: "top-bar flex items-center justify-between",
-            h1 {match status {
-                Some(status) => match status {
-                    DownloadStatus::Downloading => "Active",
-                    DownloadStatus::Queued => "Queued",
-                    DownloadStatus::Finished => "Finished",
-                    DownloadStatus::Failed => "Failed",
-                    DownloadStatus::Cancelled => "Cancelled",
-                    DownloadStatus::Paused => "Paused",
-                },
-                None => "All Downloads",
+            h1 {match current_page() {
+                Pages::Downloading => "Downloading",
+                Pages::Queued => "Queued",
+                Pages::Stopped => "Stopped",
+                Pages::Settings => "Settings",
+                Pages::About => "About"
             }},
             button {class: "download-dialog-button flex items-center justify-center", onclick: move |_| *show_dialog.write() = true, "" }
         }

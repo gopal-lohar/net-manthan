@@ -26,7 +26,7 @@ pub mod progress_aggregator;
 pub mod types;
 
 /// Represents a download in the database
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Download {
     pub download_id: String,
     pub filename: String,
@@ -38,10 +38,13 @@ pub struct Download {
     pub size_downloaded: u64,
     pub average_speed: u64,
     pub date_added: DateTime<Utc>,
-    pub date_finished: Option<DateTime<Utc>>,
     pub active_time: u64, // Stored as seconds
-    pub paused: bool,     // New field: indicates if the download is currently paused
-    pub error: bool,      // New field: indicates if the download has encountered an error
+    pub status: DownloadStatus,
+    // Obselete from here
+    pub date_finished: Option<DateTime<Utc>>,
+    pub paused: bool, // New field: indicates if the download is currently paused
+    pub error: bool,  // New field: indicates if the download has encountered an error
+    // Obselete till here
     pub parts: Vec<DownloadPart>,
 }
 
@@ -164,6 +167,7 @@ impl Download {
             size_downloaded: 0,
             average_speed: 0,
             date_added: Utc::now(),
+            status: DownloadStatus::Connecting,
             date_finished: None,
             active_time: 0,
             paused: true,
@@ -173,7 +177,7 @@ impl Download {
     }
 
     pub async fn start(
-        &self,
+        &mut self,
         aggregator_sender: Sender<Vec<PartProgress>>,
         config: NetManthanConfig,
         cancel_token: Arc<AtomicBool>,
@@ -218,6 +222,8 @@ impl Download {
                 cancel_token,
             ));
         }
+
+        self.status = DownloadStatus::Connecting;
 
         tokio::spawn(progress_aggregator(
             part_progress_vec,

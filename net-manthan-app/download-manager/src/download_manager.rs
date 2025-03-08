@@ -3,7 +3,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use crossbeam_channel::{bounded, select, Receiver, Sender};
-use download_engine::types::{DownloadRequest, PartProgress};
+use download_engine::types::{DownloadRequest, DownloadStatus, PartProgress};
 use download_engine::Download;
 use download_engine::{
     config::NetManthanConfig,
@@ -83,15 +83,19 @@ impl DownloadManager {
     pub async fn handle_ipc_request(&mut self, request: IpcRequest) -> IpcResponse {
         match request {
             IpcRequest::HeartBeat => IpcResponse::HeartBeat,
-            IpcRequest::ListDownloads {
-                incomplete_only,
-                detailed,
-                limit,
-            } => {
-                _ = incomplete_only;
-                _ = detailed;
-                _ = limit;
-                let downloads = self.all_downloads.clone();
+            IpcRequest::GetDownloads(status_vec) => {
+                let downloads = self
+                    .all_downloads
+                    .clone()
+                    .into_iter()
+                    .filter(|d| {
+                        status_vec.iter().any(|status| match (status, &d.status) {
+                            (DownloadStatus::Completed(_), DownloadStatus::Completed(_)) => true,
+                            (DownloadStatus::Failed(_), DownloadStatus::Failed(_)) => true,
+                            (s1, s2) => s1 == s2,
+                        })
+                    })
+                    .collect();
                 IpcResponse::DownloadsList(downloads)
             }
             IpcRequest::GetActiveDownloads {} => {

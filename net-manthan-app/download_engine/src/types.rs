@@ -38,11 +38,7 @@ pub enum DownloadStatus {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum IpcRequest {
     HeartBeat,
-    ListDownloads {
-        incomplete_only: bool,
-        detailed: bool,
-        limit: Option<usize>,
-    },
+    GetDownloads(Vec<DownloadStatus>),
     GetActiveDownloads {},
     StartDownload {
         url: String,

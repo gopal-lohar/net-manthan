@@ -12,11 +12,17 @@
 .main-container {
     width: 100%;
     height: 100%;
+    overflow: auto;
 }
 
 .top-bar {
     font-size: 1.5rem;
     padding-block: 2rem;
+    position: sticky;
+    top: 0px;
+    background: white;
+    border-bottom: 1px solid hsl(0, 0%, 90%);
+    z-index: 9999;
 }
 
 .container {

@@ -10,7 +10,8 @@ edition = "2021"
 dioxus = { version = "0.6.0", features = [] }
 utils = { path = "../utils" }
 download_engine = { path = "../download_engine" }
-async-std = "1.13.0"
+chrono.workspace = true
+tokio.workspace = true
 
 [features]
 default = ["desktop"]

@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
+use download_engine::types::DownloadStatus;
 use download_engine::{Download, DownloadPart};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use std::path::{Path, PathBuf};
@@ -416,6 +417,7 @@ impl DatabaseManager {
             size_downloaded: row.get(7)?,
             average_speed: row.get(8)?,
             date_added,
+            status: DownloadStatus::Paused {},
             date_finished,
             active_time: row.get(11)?,
             paused: row.get(12)?,
@@ -712,6 +714,7 @@ mod tests {
             size_downloaded: 0,
             average_speed: 0,
             date_added: Utc::now(),
+            status: DownloadStatus::Downloading,
             date_finished: None,
             active_time: 0,
             paused: false,
