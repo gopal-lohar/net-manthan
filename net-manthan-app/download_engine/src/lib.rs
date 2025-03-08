@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::{atomic::AtomicBool, Arc};
+use types::DownloadStatus;
 use uuid::Uuid;
 
 pub mod config;
@@ -184,13 +185,10 @@ impl Download {
                 .parts
                 .iter()
                 .map(|part| PartProgress {
-                    download_id: self.download_id.clone(),
                     part_id: part.part_id.clone(),
                     bytes_downloaded: part.bytes_downloaded,
-                    total_bytes: part.total_bytes,
-                    speed: self.average_speed,
-                    timestamp: chrono::Utc::now(),
-                    error: false,
+                    speed_in_bytes: self.average_speed,
+                    status: DownloadStatus::Connecting,
                 })
                 .collect::<Vec<PartProgress>>();
             tokio::spawn(progress_aggregator(

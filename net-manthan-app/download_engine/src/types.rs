@@ -17,13 +17,10 @@ pub struct DownloadRequest {
 /// (the aggregator thread just sends a vector of these)
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PartProgress {
-    pub download_id: String,
     pub part_id: String,
     pub bytes_downloaded: u64,
-    pub total_bytes: u64,
-    pub speed: u64,
-    pub timestamp: DateTime<Utc>,
-    pub error: bool,
+    pub speed_in_bytes: u64,
+    pub status: DownloadStatus,
 }
 
 // ----------------- IPC MESSAGES -----------------
@@ -71,60 +68,17 @@ pub enum IpcResponse {
     HeartBeat,
     Success,
     Error(String),
-    DownloadProgress(DownloadProgress),
     DownloadsList(Vec<Download>),
     Config(NetManthanConfig),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DownloadInfo {
-    pub id: u64,
-    pub url: String,
-    pub output_path: PathBuf,
-    pub status: DownloadStatus,
-    pub created_at: DateTime<Utc>,
-    pub total_size: Option<u64>,
-    pub downloaded_size: u64,
-    pub thread_count: u8,
-    pub average_speed: f64, // bytes per second
-    pub error: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum DownloadStatus {
     Queued,
     Connecting,
     Downloading,
     Paused,
-    Completed,
-    Error,
-}
-
-/// Real-time progress information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DownloadProgress {
-    pub id: u64,
-    pub status: DownloadStatus,
-    pub downloaded_size: u64,
-    pub total_size: Option<u64>,
-    pub speed: u64,
-    pub threads_info: Option<Vec<ThreadProgress>>,
-}
-
-/// Per-thread progress information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ThreadProgress {
-    pub thread_id: u8,
-    pub start_byte: u64,
-    pub end_byte: u64,
-    pub current_byte: u64,
-    pub speed: f64,
-    pub status: DownloadStatus,
-}
-
-impl DownloadProgress {
-    pub fn progress_percentage(&self) -> Option<f64> {
-        self.total_size
-            .map(|total| (self.downloaded_size as f64 / total as f64) * 100.0)
-    }
+    Completed(DateTime<Utc>),
+    Failed(String),
+    Cancelled,
 }

@@ -152,11 +152,13 @@ impl DownloadManager {
 
     pub fn handle_progress_update(&mut self, progress_vec: Vec<PartProgress>) {
         // TODO: close download threads after it's done
-        if let Some(download_index) = self
-            .all_downloads
-            .iter()
-            .position(|download| download.download_id == progress_vec[0].download_id)
-        {
+        if let Some(download_index) = self.all_downloads.iter().position(|download| {
+            download
+                .parts
+                .iter()
+                .position(|part| part.part_id == progress_vec[0].part_id)
+                .is_some()
+        }) {
             let download = &mut self.all_downloads[download_index];
 
             for download_part in &mut download.parts {

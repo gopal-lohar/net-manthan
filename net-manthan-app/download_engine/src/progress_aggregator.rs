@@ -24,10 +24,7 @@ pub async fn progress_aggregator(
             Ok(part_progress) => {
                 let part_id = part_progress.part_id.clone();
                 if let Some(x) = download_progress.iter_mut().find(|x| x.part_id == part_id) {
-                    *x = PartProgress {
-                        download_id: x.download_id.clone(),
-                        ..part_progress
-                    };
+                    *x = part_progress;
                 }
             }
             Err(_) => {}

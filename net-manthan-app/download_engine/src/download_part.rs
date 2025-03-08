@@ -1,4 +1,7 @@
-use crate::{errors::DownloadError, types::PartProgress};
+use crate::{
+    errors::DownloadError,
+    types::{DownloadStatus, PartProgress},
+};
 use chrono::{Duration, Utc};
 use crossbeam_channel::Sender;
 use futures_util::StreamExt;
@@ -96,13 +99,6 @@ pub async fn download_part(
         }
     };
 
-    let download_size = response
-        .headers()
-        .get(header::CONTENT_LENGTH)
-        .and_then(|val| val.to_str().ok())
-        .and_then(|val| val.parse::<u64>().ok())
-        .unwrap_or(0);
-
     let mut stream = response.bytes_stream();
 
     let start_time = Utc::now();
@@ -126,15 +122,11 @@ pub async fn download_part(
                     bytes_downloaded_last = 0;
                     last_update_time = Utc::now();
 
-                    // TODO: fix by not sending empty string
                     let progress = PartProgress {
-                        download_id: "".to_string(),
                         part_id: part_id.clone(),
                         bytes_downloaded,
-                        total_bytes: download_size,
-                        speed: speed_in_bytes,
-                        timestamp: Utc::now(),
-                        error: false,
+                        speed_in_bytes,
+                        status: DownloadStatus::Downloading,
                     };
 
                     if progress_sender.send(progress).is_err()
@@ -156,17 +148,15 @@ pub async fn download_part(
 
     bytes_downloaded += bytes_downloaded_last;
     let progress = PartProgress {
-        download_id: "".to_string(),
         part_id,
         bytes_downloaded,
-        total_bytes: download_size,
-        speed: speed_in_bytes,
-        timestamp: Utc::now(),
-        error: false,
+        speed_in_bytes,
+        status: DownloadStatus::Completed(Utc::now()),
     };
     match progress_sender.send(progress) {
         Ok(_) => {}
         Err(_) => {}
     }
+
     Ok(())
 }
