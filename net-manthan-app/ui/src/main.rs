@@ -173,6 +173,8 @@ pub fn DownloadItem(client: Signal<Option<Client>>, download: Download) -> Eleme
     } else {
         0.0
     };
+    // temporary solution
+    let status_copy = download.status.clone();
     rsx! {
         div { class: "download-item flex flex-column",
             div {
@@ -185,7 +187,11 @@ pub fn DownloadItem(client: Signal<Option<Client>>, download: Download) -> Eleme
                         if let Some(client) = &mut *client.write() {
                             match client.send_and_receive(IpcRequest::ChangeDownloadStatus {
                                 download_id: download.download_id.clone(),
-                                download_status: DownloadStatus::Paused }) {
+                                download_status: match status_copy{
+                                    DownloadStatus::Connecting => DownloadStatus::Paused,
+                                    DownloadStatus::Downloading => DownloadStatus::Paused,
+                                    _ => DownloadStatus::Downloading
+                                } }) {
                                     Ok(response) => {
                                         match response {
                                             IpcResponse::Success => {

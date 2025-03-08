@@ -117,6 +117,7 @@ impl DownloadManager {
                 _ = output_path;
                 _ = thread_count;
                 _ = headers;
+                info!("Starting New Download");
                 let download = match Download::new(
                     DownloadRequest {
                         url,
@@ -131,7 +132,6 @@ impl DownloadManager {
                 {
                     Ok(mut download) => {
                         let cancel_handle = Arc::new(AtomicBool::new(false));
-                        info!("Starting download");
                         download
                             .start(
                                 self.aggregator_sender.clone(),
@@ -139,7 +139,7 @@ impl DownloadManager {
                                 cancel_handle.clone(),
                             )
                             .await;
-                        info!("Download started");
+                        info!("New Download started");
                         self.all_downloads.push(download.clone());
                         match self.db_manager.insert_download(&mut download) {
                             Ok(_) => {
@@ -165,6 +165,7 @@ impl DownloadManager {
                 {
                     match download_status {
                         DownloadStatus::Paused => {
+                            // TODO: some checks are needed
                             if let Some(cancel_token) = self.active_download.remove(&download_id) {
                                 cancel_token.store(true, Ordering::Relaxed);
                                 download.status = DownloadStatus::Paused;
@@ -173,6 +174,21 @@ impl DownloadManager {
                             } else {
                                 IpcResponse::Error("Download not active".to_string())
                             }
+                        }
+                        DownloadStatus::Downloading => {
+                            let cancel_handle = Arc::new(AtomicBool::new(false));
+                            info!("resuming the download");
+                            download
+                                .start(
+                                    self.aggregator_sender.clone(),
+                                    self.config.clone(),
+                                    cancel_handle.clone(),
+                                )
+                                .await;
+                            self.active_download
+                                .insert(download.download_id.clone(), cancel_handle);
+                            info!("Download started");
+                            IpcResponse::Success {}
                         }
                         _ => IpcResponse::Error("Unsupported download status".to_string()),
                     }
