@@ -28,7 +28,7 @@ pub fn init_logger(app_name: &str, log_dir: PathBuf) -> Result<(), Box<dyn std::
         .with_writer(non_blocking);
 
     // Create a filter based on RUST_LOG env var or default to info
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug"));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     // Install both layers with a single init call
     tracing_subscriber::registry()

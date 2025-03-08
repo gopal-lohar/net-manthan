@@ -44,6 +44,19 @@
     border-color: hsl(255, 50%, 75%);
 }
 
+.icon-button {
+    --size: 2rem;
+    width: var(--size);
+    height: var(--size);
+    background-color: transparent;
+}
+
+.icon {
+    --size: 2rem;
+    width: var(--size);
+    height: var(--size);
+}
+
 .progress-bar {
     --progress: 100%;
     background: hsl(225, 50%, 95%);

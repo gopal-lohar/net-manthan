@@ -60,7 +60,7 @@ fn handle_client(
         match stream.read_exact(&mut message_buffer) {
             Ok(_) => match deserialize::<IpcRequest>(&message_buffer) {
                 Ok(request) => {
-                    info!("IPC message received from the client: {:?}", request);
+                    debug!("IPC message request from the client: {:?}", request);
                     if let Err(e) = ipc_request_sender.send(request) {
                         error!("Failed to forward IPC request: {}", e);
                         break;
@@ -82,7 +82,7 @@ fn handle_client(
                                     error!("Failed to send response (while flushing): {}", e);
                                     break;
                                 } else {
-                                    info!("Response sent to client successfully: {:?}", response);
+                                    debug!("Response sent to client successfully: {:?}", response);
                                 }
                             }
                             Err(e) => {

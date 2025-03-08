@@ -46,6 +46,10 @@ pub enum IpcRequest {
         thread_count: Option<u8>,
         headers: Option<Vec<String>>,
     },
+    ChangeDownloadStatus {
+        download_id: String,
+        download_status: DownloadStatus,
+    },
     GetConfig,
 }
 

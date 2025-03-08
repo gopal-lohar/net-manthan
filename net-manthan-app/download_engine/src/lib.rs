@@ -223,7 +223,7 @@ impl Download {
             ));
         }
 
-        self.status = DownloadStatus::Connecting;
+        self.status = DownloadStatus::Downloading;
 
         tokio::spawn(progress_aggregator(
             part_progress_vec,

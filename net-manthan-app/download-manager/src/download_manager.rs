@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crossbeam_channel::{bounded, select, Receiver, Sender};
@@ -153,6 +153,32 @@ impl DownloadManager {
                     Err(err) => IpcResponse::Error(err.to_string()),
                 };
                 download
+            }
+            IpcRequest::ChangeDownloadStatus {
+                download_id,
+                download_status,
+            } => {
+                if let Some(download) = self
+                    .all_downloads
+                    .iter_mut()
+                    .find(|d| d.download_id == download_id)
+                {
+                    match download_status {
+                        DownloadStatus::Paused => {
+                            if let Some(cancel_token) = self.active_download.remove(&download_id) {
+                                cancel_token.store(true, Ordering::Relaxed);
+                                download.status = DownloadStatus::Paused;
+                                info!("Download {} paused", download_id);
+                                IpcResponse::Success {}
+                            } else {
+                                IpcResponse::Error("Download not active".to_string())
+                            }
+                        }
+                        _ => IpcResponse::Error("Unsupported download status".to_string()),
+                    }
+                } else {
+                    IpcResponse::Error("Download not found".to_string())
+                }
             }
             IpcRequest::GetConfig => {
                 let config = self.config.clone();

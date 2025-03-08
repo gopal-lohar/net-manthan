@@ -20,6 +20,9 @@ const UTILS_CSS: Asset = asset!("/assets/utils.css");
 const DIALOG_CSS: Asset = asset!("/assets/dialog.css");
 const SIDEBAR_CSS: Asset = asset!("/assets/sidebar.css");
 
+const PAUSE_ICON: Asset = asset!("/assets/icons/pause_circle_icon.svg");
+const PLAY_ICON: Asset = asset!("/assets/icons/play_circle_icon.svg");
+
 fn main() {
     dioxus::launch(App);
 }
@@ -122,7 +125,7 @@ pub fn MainContainer(
                     current_page,
                     show_dialog
                 }
-                DownloadList { downloads: downloads }
+                DownloadList { client, downloads }
             }
         }
     }
@@ -145,7 +148,7 @@ pub fn TopBar(current_page: Signal<Pages>, show_dialog: Signal<bool>) -> Element
 }
 
 #[component]
-pub fn DownloadList(downloads: Vec<Download>) -> Element {
+pub fn DownloadList(client: Signal<Option<Client>>, downloads: Vec<Download>) -> Element {
     rsx! {
         div { class: "download-list",
             if downloads.is_empty() {
@@ -153,7 +156,7 @@ pub fn DownloadList(downloads: Vec<Download>) -> Element {
             } else {
                 {downloads.iter().map(|download| {
                     rsx! {
-                        DownloadItem { key: "{download.download_id}", download: download.clone() }
+                        DownloadItem { key: "{download.download_id}", client, download: download.clone() }
                     }
                 })}
             }
@@ -162,7 +165,7 @@ pub fn DownloadList(downloads: Vec<Download>) -> Element {
 }
 
 #[component]
-pub fn DownloadItem(download: Download) -> Element {
+pub fn DownloadItem(client: Signal<Option<Client>>, download: Download) -> Element {
     let total: u64 = download.parts.iter().map(|p| p.total_bytes).sum();
     let downloaded: u64 = download.parts.iter().map(|p| p.bytes_downloaded).sum();
     let progress = if total > 0 {
@@ -172,7 +175,41 @@ pub fn DownloadItem(download: Download) -> Element {
     };
     rsx! {
         div { class: "download-item flex flex-column",
-            div { class: "download-name", "{download.filename}" }
+            div {
+                class: "download-name flex items-center justify-between",
+                div{"{download.filename}"},
+                button{
+                    class: "icon-button",
+
+                    onclick: move |_|{
+                        if let Some(client) = &mut *client.write() {
+                            match client.send_and_receive(IpcRequest::ChangeDownloadStatus {
+                                download_id: download.download_id.clone(),
+                                download_status: DownloadStatus::Paused }) {
+                                    Ok(response) => {
+                                        match response {
+                                            IpcResponse::Success => {
+                                                println!("Download status changed");
+                                            }
+                                            _ => println!("Unexpected response"),
+                                        }
+                                        println!("Download status change REQUESTED")
+                                    },
+                                    Err(e) => println!("Error changing download status: {}", e),
+                                }
+                        }
+                    },
+                    img{
+                        src: match download.status{
+                            DownloadStatus::Connecting => PAUSE_ICON,
+                            DownloadStatus::Downloading => PAUSE_ICON,
+                            _ => PLAY_ICON
+                        },
+                        class: "icon",
+                        alt: "Pause"
+                    }
+                }
+            }
             div { class: "progress-bar", "data-progress": "70%", style: "--progress: {progress}%"}
             div { class: "flex items-center justify-between",
                 div{"{format_bytes(downloaded)}/{format_bytes(total)}"},
