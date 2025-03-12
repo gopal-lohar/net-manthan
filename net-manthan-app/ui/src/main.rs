@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 mod components;
 
 use chrono::Utc;
@@ -13,6 +15,8 @@ use std::time::Duration;
 use tokio::time::sleep;
 use utils::format_bytes;
 use utils::Client;
+
+const APP_ICON: Asset = asset!("/icons/icon.ico");
 
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 const PREFLIGHT_CSS: Asset = asset!("/assets/preflight.css");
@@ -88,6 +92,9 @@ fn App() -> Element {
     });
 
     rsx! {
+        document::Title { "Net Manthan" }
+        document::Link { rel: "icon", href: APP_ICON }
+
         document::Link { rel: "stylesheet", href: MAIN_CSS }
         document::Link { rel: "stylesheet", href: PREFLIGHT_CSS }
         document::Link { rel: "stylesheet", href: UTILS_CSS }

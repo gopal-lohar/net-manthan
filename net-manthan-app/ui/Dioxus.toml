@@ -19,3 +19,20 @@ script = []
 # Javascript code file
 # serve: [dev-server] only
 script = []
+
+[bundle]
+identifier = "com.netmanthan"
+publisher = "NetManthan"
+
+[build]
+target = "x86_64-pc-windows-msvc"
+
+[package.metadata.bundle]
+windows = { winres = true }
+
+[[bin]]
+name = "net_manthan"
+path = "src/main.rs"
+test = false
+bench = false
+crate-type = ["bin"]
