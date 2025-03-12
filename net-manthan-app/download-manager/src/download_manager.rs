@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use chrono::Utc;
 use crossbeam_channel::{bounded, select, Receiver, Sender};
 use download_engine::types::{DownloadRequest, DownloadStatus, PartProgress};
 use download_engine::Download;
@@ -205,6 +206,7 @@ impl DownloadManager {
 
     pub fn handle_progress_update(&mut self, progress_vec: Vec<PartProgress>) {
         // TODO: close download threads after it's done
+        // TODO: the threads (neither download nor aggregate) are not really handled properly
         if let Some(download_index) = self.all_downloads.iter().position(|download| {
             download
                 .parts
@@ -227,6 +229,29 @@ impl DownloadManager {
                         }
                     }
                 }
+            }
+
+            if progress_vec
+                .iter()
+                .all(|p| matches!(p.status, DownloadStatus::Completed(_)))
+            {
+                download.status = DownloadStatus::Completed(
+                    if let Some(time) = progress_vec
+                        .iter()
+                        .filter_map(|item| {
+                            if let DownloadStatus::Completed(time) = item.status {
+                                Some(time)
+                            } else {
+                                None
+                            }
+                        })
+                        .max()
+                    {
+                        time
+                    } else {
+                        Utc::now()
+                    },
+                );
             }
         } else {
             error!("download not found");

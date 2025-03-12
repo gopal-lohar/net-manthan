@@ -59,8 +59,8 @@ async fn main() {
             debug!("IPC server started at {}", ipc_server_address);
             (sender, receiver)
         }
-        Err(_) => {
-            error!("Failed to start IPC server");
+        Err(err) => {
+            error!("Failed to start IPC server: {}", err);
             std::process::exit(1);
         }
     };

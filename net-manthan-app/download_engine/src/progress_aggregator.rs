@@ -23,6 +23,9 @@ pub async fn progress_aggregator(
                     let mut vec = Vec::new();
                     for part in &part_progress_vec {
                         let guard = part.lock().await;
+                        // Explanation: if any part is Queued, Connecting, or Downloading we don't want to exit the thread
+                        // but if all parts are [Paused, Completed, Failed, or Cancelled] we want to exit the thread
+                        // the same will be handled at the ipc part
                         let something_going_on = match guard.status {
                             DownloadStatus::Queued => true,
                             DownloadStatus::Connecting => true,
