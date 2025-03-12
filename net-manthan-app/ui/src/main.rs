@@ -87,8 +87,13 @@ fn App() -> Element {
     use_future(move || async move {
         loop {
             fetch_downloads();
-            sleep(Duration::from_millis(500)).await;
+            sleep(Duration::from_millis(5000)).await;
         }
+    });
+
+    use_effect(move || {
+        _ = current_page();
+        fetch_downloads();
     });
 
     rsx! {
