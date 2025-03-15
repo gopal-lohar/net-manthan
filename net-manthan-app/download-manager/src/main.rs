@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 use download_db_manager::connect_to_database;
 use download_engine::config::NetManthanConfig;
@@ -21,6 +21,16 @@ async fn main() {
             NetManthanConfig::get_default_config()
         }
     };
+
+    if !&config.download_dir.exists() {
+        match fs::create_dir_all(&config.download_dir) {
+            Ok(_) => (),
+            Err(e) => {
+                error!("Failed to create download directory: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
 
     match logging::init_logger("Net Manthan", PathBuf::from(config.log_path.clone())) {
         Ok(_) => (),

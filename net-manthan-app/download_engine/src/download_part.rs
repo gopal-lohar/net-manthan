@@ -22,13 +22,13 @@ use tokio::sync::Mutex;
 fn open_download_file(
     filepath: PathBuf,
     range: Option<(u64, u64)>,
-    bytes_downloaded: u64,
+    _bytes_downloaded: u64, // Not required since the range itself has the calculation
     buffer_size: u64,
 ) -> Result<BufWriter<File>, std::io::Error> {
     let mut file = OpenOptions::new().write(true).open(filepath)?;
     match range {
         Some((start, _)) => {
-            file.seek(std::io::SeekFrom::Start(start + bytes_downloaded))?;
+            file.seek(std::io::SeekFrom::Start(start))?;
         }
         None => {}
     }
