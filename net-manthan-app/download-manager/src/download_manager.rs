@@ -179,6 +179,12 @@ impl DownloadManager {
                         DownloadStatus::Downloading => {
                             let cancel_handle = Arc::new(AtomicBool::new(false));
                             info!("resuming the download");
+                            if !download.resumable {
+                                for part in download.parts.iter_mut() {
+                                    part.bytes_downloaded = 0;
+                                }
+                            }
+
                             download
                                 .start(
                                     self.aggregator_sender.clone(),

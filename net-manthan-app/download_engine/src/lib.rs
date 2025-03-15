@@ -194,7 +194,7 @@ impl Download {
         for part in &self.parts {
             let cancel_token = cancel_token.clone();
             let range = if self.resumable && self.parts.len() > 1 {
-                Some((part.start_bytes, part.end_bytes))
+                Some((part.start_bytes + part.bytes_downloaded, part.end_bytes))
             } else if self.resumable == false && self.parts.len() == 1 {
                 None
             } else {
