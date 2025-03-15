@@ -5,7 +5,8 @@ members = [
     "download-manager",
     "native-message-host",
     "download_engine",
-    "utils", "ui",
+    "utils",
+    "ui",
 ]
 
 [workspace.dependencies]
@@ -26,6 +27,7 @@ toml = "0.8.20"
 futures-util = "0.3.31"
 crossbeam-channel = "0.5.14"
 tracing-appender = "0.2.3"
+color-eyre = "0.6.3"
 
 [profile]
 

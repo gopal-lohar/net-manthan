@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 utils = { path = "../utils" }
 download_engine = { path = "../download_engine" }
-clap = { version = "4.5.27", features = ["derive"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true
-color-eyre = "0.6.3"
+color-eyre.workspace = true
+clap = { version = "4.5.27", features = ["derive"] }
