@@ -109,12 +109,14 @@ fn App() -> Element {
             Sidebar{
                 current_page
             },
+
         MainContainer {
             current_page,
             client: client.clone(),
             downloads: downloads().clone(),
             show_dialog
         }
+
         if show_dialog() == true {
             Dialog {client: client.clone(), show_dialog}
         }
@@ -137,7 +139,24 @@ pub fn MainContainer(
                     current_page,
                     show_dialog
                 }
-                DownloadList { client, downloads }
+
+                match current_page() {
+                    Pages::Settings =>{
+                        rsx!{
+                            SettingsPage{}
+                        }
+                    }
+                    Pages::About =>{
+                        rsx!{
+                            AboutPage{}
+                        }
+                    }
+                    _ => {
+                        rsx!{
+                            DownloadList { client, downloads }
+                        }
+                    }
+                }
             }
         }
     }
@@ -234,5 +253,21 @@ pub fn DownloadItem(client: Signal<Option<Client>>, download: Download) -> Eleme
                 div{"{progress:.2}%"}
             }
         }
+    }
+}
+
+#[component]
+pub fn SettingsPage() -> Element {
+    rsx! {div {
+            "Yet to implement"
+    }}
+}
+
+#[component]
+pub fn AboutPage() -> Element {
+    rsx! {
+        div {
+            "Yet to implement"
+    }
     }
 }
