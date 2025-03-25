@@ -1,4 +1,5 @@
 [application]
+icons = ["icons/icon.png"]
 
 [web.app]
 
@@ -23,6 +24,7 @@ script = []
 [bundle]
 identifier = "com.netmanthan"
 publisher = "NetManthan"
+icon = ["icons/icon_512x512.png"]
 
 [build]
 target = "x86_64-pc-windows-msvc"
