@@ -106,3 +106,19 @@
 .download-dialog-button:hover {
     background: hsl(0, 0%, 90%);
 }
+
+.other-pages {
+    padding: 1rem;
+}
+
+.other-pages > * {
+    margin-top: 1rem;
+}
+
+.other-pages li {
+    margin-top: 0.5rem;
+}
+
+.no-downloads {
+    padding: 2rem;
+}

@@ -258,9 +258,47 @@ pub fn DownloadItem(client: Signal<Option<Client>>, download: Download) -> Eleme
 
 #[component]
 pub fn SettingsPage() -> Element {
-    rsx! {div {
-            "Yet to implement"
-    }}
+    rsx! {
+        div {
+            class: "other-pages",
+            div {
+                "The Settings Page is yet to be implemented although you can directly edit the configuration file located at net-manthan-app/.dev/config.toml this file is the root configuration file for the application. It contains various settings and configurations that control the behavior of the application."
+            }
+            div {
+                "The currently working options are the following:"
+                ul {
+                    li{
+                        b {"Thread Count = 5 "}
+                        "[Number of thread counts to split a download into when launching a download. A download that is already in progress will not be affected by this setting]"
+                    }
+                    li{
+                        b {"Update Interval = 1000 "}
+                        "[Interval in milliseconds at which the application checks for updates. from the download download threads and their aggregator]"
+                    }
+                    li{
+                        b {"IPC Server Address = 127.0.0.1 "}
+                        "[Address of the IPC server that the application uses to communicate with the download threads and their aggregator.]"
+                    }
+                    li{
+                        b {"IPC Server Port = 8814 "}
+                        "[Port of the IPC server that the application uses to communicate with the download threads and their aggregator]"
+                    }
+                    li{
+                        b {"Download Directory = ./.dev/downloads "}
+                        "[Directory where the application will store downloaded files]"
+                    }
+                    li{
+                        b {"Database Path = ./.dev/downloads.db "}
+                        "[Path to the database file that the application uses to store download information]"
+                    }
+                    li{
+                        b {"Log Path = ./.dev/logs/ "}
+                        "[Path to the directory where the application will store log files]"
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[component]
@@ -268,6 +306,6 @@ pub fn AboutPage() -> Element {
     rsx! {
         div {
             "Yet to implement"
-    }
+        }
     }
 }
