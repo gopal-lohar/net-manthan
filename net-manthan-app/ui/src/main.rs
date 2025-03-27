@@ -305,7 +305,36 @@ pub fn SettingsPage() -> Element {
 pub fn AboutPage() -> Element {
     rsx! {
         div {
-            "Yet to implement"
+            class: "other-pages",
+            p{
+                b{
+                    "Net Manthan "
+                }
+                "is a Multithreaded, Multiprocess download manager written entirely in rust."
+            }
+            p{
+                "The project is open source and can be found on GitHub at "
+                a{
+                    href: "https://github.com/gopal-lohar/net-manthan",
+                    target: "_blank",
+                    rel: "noopener noreferrer",
+                    "https://github.com/gopal-lohar/net-manthan"
+                }
+            }
+            p{
+                "The application is under active development and is not yet ready for production use. currently the bunding is not yet implemented. So you can only use it by building it from source by yourself. You can find all the details about building the application from source on the GitHub repository. and the for setting you can refer to the file .dev/config.toml for more information about setting go to the Setting page or visit the Github repository."
+            }
+            p{
+                "Although the application is under active development, it is already functional and can be used for downloading files. And while writing the application one of the goal was making it cross-platform compatible. so parts of the application are already cross-platform compatible and can be used on multiple platforms."
+            }
+            p{"Go give it a star on "
+                a{
+                    href: "https://github.com/gopal-lohar/net-manthan",
+                    target: "_blank",
+                    rel: "noopener noreferrer",
+                    "Github"
+                }
+            }
         }
     }
 }

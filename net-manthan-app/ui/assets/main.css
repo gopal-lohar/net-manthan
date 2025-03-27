@@ -119,6 +119,10 @@
     margin-top: 0.5rem;
 }
 
+.other-pages a {
+    color: hsl(220, 75%, 50%);
+}
+
 .no-downloads {
     padding: 2rem;
 }
