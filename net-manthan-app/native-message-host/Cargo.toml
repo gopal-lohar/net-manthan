@@ -9,3 +9,6 @@ download_engine = { path = "../download_engine" }
 serde.workspace = true
 serde_json.workspace = true
 chrome_native_messaging = "0.3.0"
+
+[build-dependencies]
+serde_json.workspace = true
