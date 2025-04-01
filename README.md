@@ -33,7 +33,7 @@ The root of the repository has two directories
 - Crossbeam
 - Tokio
 - SQLite
-- Tauri
+- Dioxus
 - Browser Extension APIs
 
 ## 🔧 Installation
