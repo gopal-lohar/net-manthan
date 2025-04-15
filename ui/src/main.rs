@@ -1,54 +1,44 @@
 use gpui::{
-    App, Application, Bounds, Context, SharedString, Window, WindowBounds, WindowOptions, div,
-    prelude::*, px, rgb, size,
+    App, Application, TitlebarOptions, WindowBackgroundAppearance, WindowKind, WindowOptions,
+    point, prelude::*, px,
 };
 
-struct HelloWorld {
-    text: SharedString,
-}
+use net_manthan_ui::NetManthanUi;
+use title_bar::TitleBar;
 
-impl Render for HelloWorld {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .flex()
-            .flex_col()
-            .gap_3()
-            .bg(rgb(0x505050))
-            .w_full()
-            .h_full()
-            .justify_center()
-            .items_center()
-            .shadow_lg()
-            .border_1()
-            .border_color(rgb(0x0000ff))
-            .text_xl()
-            .text_color(rgb(0xffffff))
-            .child(format!("Hello, {}!", &self.text))
-            .child(
-                div()
-                    .flex()
-                    .gap_2()
-                    .child(div().size_8().bg(gpui::red()))
-                    .child(div().size_8().bg(gpui::green()))
-                    .child(div().size_8().bg(gpui::blue()))
-                    .child(div().size_8().bg(gpui::yellow()))
-                    .child(div().size_8().bg(gpui::black()))
-                    .child(div().size_8().bg(gpui::white())),
-            )
-    }
-}
+mod net_manthan_ui;
+pub mod title_bar;
 
 fn main() {
     Application::new().run(|cx: &mut App| {
-        let bounds = Bounds::centered(None, size(px(500.), px(500.0)), cx);
+        gpui_tokio::init(cx);
+        // TODO: Initialize logging
+        // TODO: Start the server/daemon
+        // TODO: Initialize the settings and adapt some things like default window size etc.
         cx.open_window(
             WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                titlebar: Some(TitlebarOptions {
+                    title: None,
+                    appears_transparent: true,
+                    traffic_light_position: Some(point(px(9.0), px(9.0))),
+                }),
+                window_bounds: None,
+                focus: false,
+                show: false,
+                kind: WindowKind::Normal,
+                is_movable: true,
+                window_background: WindowBackgroundAppearance::Transparent,
+                window_decorations: Some(gpui::WindowDecorations::Server),
+                window_min_size: Some(gpui::Size {
+                    width: px(360.0),
+                    height: px(240.0),
+                }),
                 ..Default::default()
             },
             |_, cx| {
-                cx.new(|_| HelloWorld {
+                cx.new(|cx| NetManthanUi {
                     text: "World".into(),
+                    title_bar: cx.new(|_| TitleBar::new()),
                 })
             },
         )
