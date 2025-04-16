@@ -1,4 +1,4 @@
-use gpui::{IntoElement, Window, div, rgb, MouseButton};
+use gpui::{IntoElement, MouseButton, Window, div, rgb};
 use ui::ParentElement;
 
 #[derive(Clone, Copy)]
@@ -34,20 +34,25 @@ impl SideBar {
 }
 
 impl Render for SideBar {
-    fn render(&mut self, _window: &mut Window,  cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .children(self.tabs.iter().map(|tab| {
                 let tab_clone = tab.clone();
                 div()
                     .child(tab.get_title())
-                    .hover(|s| s.bg(rgb(0x101020))).cursor_pointer()
-                    .on_mouse_down(MouseButton::Left,cx.listener(move |this, _ev, _window, _cx| {
-                        this.active_tab = tab_clone;}))
+                    .hover(|s| s.bg(rgb(0x101020)))
+                    .cursor_pointer()
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, _ev, _window, _cx| {
+                            this.active_tab = tab_clone;
+                        }),
+                    )
             }))
             .child(match self.active_tab {
-                Tab::Home => div().child("yeah"),
-                Tab::Settings => div().child("setting"),
-                Tab::About => div().child("bhrrr"),
+                Tab::Home => div().child("Home page here"),
+                Tab::Settings => div().child("Settings page here"),
+                Tab::About => div().child("About page here"),
             })
     }
 }
