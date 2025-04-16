@@ -1,4 +1,4 @@
-use gpui::{Action, MouseButton, prelude::*};
+use gpui::{MouseButton, prelude::*};
 
 use ui::prelude::*;
 

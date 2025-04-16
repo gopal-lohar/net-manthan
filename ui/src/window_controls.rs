@@ -33,7 +33,7 @@ pub struct WindowControlStyle {
 }
 
 impl WindowControlStyle {
-    pub fn default(cx: &mut App) -> Self {
+    pub fn default(_cx: &mut App) -> Self {
         Self {
             background: Hsla {
                 h: 0.0,

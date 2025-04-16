@@ -1,7 +1,4 @@
-use gpui::{
-    Decorations, IntoElement, Pixels, Rgba, Window, WindowAppearance, div, prelude::*, prelude::*,
-    px, rgb,
-};
+use gpui::{Decorations, IntoElement, Pixels, Window, div, prelude::*, px, rgb};
 
 use ui::PlatformStyle;
 use ui::prelude::*;
@@ -73,7 +70,6 @@ impl Render for TitleBar {
                                     }
                                 }))
                                 .on_mouse_down_out(cx.listener(move |this, _ev, _window, _cx| {
-                                    println!("down down down down down");
                                     this.should_move = false;
                                 }))
                                 .on_mouse_up(

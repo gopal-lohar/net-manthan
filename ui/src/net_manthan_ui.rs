@@ -1,3 +1,4 @@
+use crate::components::side_bar::SideBar;
 use crate::title_bar::TitleBar;
 
 use gpui::{Context, Entity, IntoElement, SharedString, Window, div, prelude::*, rgb};
@@ -5,6 +6,7 @@ use gpui::{Context, Entity, IntoElement, SharedString, Window, div, prelude::*, 
 pub struct NetManthanUi {
     pub text: SharedString,
     pub title_bar: Entity<TitleBar>,
+    pub side_bar: Entity<SideBar>,
 }
 
 impl Render for NetManthanUi {
@@ -17,6 +19,7 @@ impl Render for NetManthanUi {
             .border_color(rgb(0x30303f))
             .text_color(rgb(0xffffff))
             .child(self.title_bar.clone())
+            .child(self.side_bar.clone())
             .child(format!("Hello, {}!", &self.text))
             .child(
                 div()

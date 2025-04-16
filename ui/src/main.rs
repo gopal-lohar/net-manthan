@@ -3,9 +3,11 @@ use gpui::{
     point, prelude::*, px,
 };
 
+use crate::components::side_bar::SideBar;
 use net_manthan_ui::NetManthanUi;
 use title_bar::TitleBar;
 
+pub mod components;
 mod net_manthan_ui;
 pub mod platforms;
 pub mod title_bar;
@@ -41,6 +43,7 @@ fn main() {
                 cx.new(|cx| NetManthanUi {
                     text: "World".into(),
                     title_bar: cx.new(|_| TitleBar::new()),
+                    side_bar: cx.new(|_| SideBar::new()),
                 })
             },
         )
