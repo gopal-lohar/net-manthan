@@ -7,7 +7,9 @@ use net_manthan_ui::NetManthanUi;
 use title_bar::TitleBar;
 
 mod net_manthan_ui;
+pub mod platforms;
 pub mod title_bar;
+pub mod window_controls;
 
 fn main() {
     Application::new().run(|cx: &mut App| {
