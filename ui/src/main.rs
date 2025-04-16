@@ -28,7 +28,7 @@ fn main() {
                 kind: WindowKind::Normal,
                 is_movable: true,
                 window_background: WindowBackgroundAppearance::Transparent,
-                window_decorations: Some(gpui::WindowDecorations::Server),
+                window_decorations: Some(gpui::WindowDecorations::Client),
                 window_min_size: Some(gpui::Size {
                     width: px(360.0),
                     height: px(240.0),
