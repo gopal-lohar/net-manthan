@@ -1,4 +1,4 @@
-use gpui::{IntoElement, MouseButton, Window, div, rgb};
+use gpui::{IntoElement, MouseButton, Window, div, prelude::*, rgb};
 use ui::ParentElement;
 
 #[derive(Clone, Copy)]

@@ -1,4 +1,4 @@
-use gpui::{Decorations, IntoElement, Pixels, Window, div, prelude::*, px, rgb};
+use gpui::{Decorations, IntoElement, Pixels, Window, div, px, rgb};
 
 use ui::PlatformStyle;
 use ui::prelude::*;

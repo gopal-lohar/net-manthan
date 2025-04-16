@@ -41,7 +41,6 @@ fn main() {
             },
             |_, cx| {
                 cx.new(|cx| NetManthanUi {
-                    text: "World".into(),
                     title_bar: cx.new(|_| TitleBar::new()),
                     side_bar: cx.new(|_| SideBar::new()),
                 })

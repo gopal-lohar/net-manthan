@@ -1,10 +1,9 @@
 use crate::components::side_bar::SideBar;
 use crate::title_bar::TitleBar;
 
-use gpui::{Context, Entity, IntoElement, SharedString, Window, div, prelude::*, rgb};
+use gpui::{Context, Entity, IntoElement, Window, div, prelude::*, rgb};
 
 pub struct NetManthanUi {
-    pub text: SharedString,
     pub title_bar: Entity<TitleBar>,
     pub side_bar: Entity<SideBar>,
 }
