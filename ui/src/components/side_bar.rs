@@ -1,7 +1,7 @@
-use gpui::{IntoElement, MouseButton, Window, div, prelude::*, rgb};
-use ui::ParentElement;
+use gpui::{IntoElement, MouseButton, Window, div, hsla, prelude::*, rgb};
+use ui::{ParentElement, Rems};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 enum Tab {
     Home,
     Settings,
@@ -35,24 +35,60 @@ impl SideBar {
 
 impl Render for SideBar {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .children(self.tabs.iter().map(|tab| {
-                let tab_clone = tab.clone();
+        div().text_color(rgb(0xffffff))
+            .h_full().flex()
+            .child(
                 div()
-                    .child(tab.get_title())
-                    .hover(|s| s.bg(rgb(0x101020)))
-                    .cursor_pointer()
-                    .on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(move |this, _ev, _window, _cx| {
-                            this.active_tab = tab_clone;
-                        }),
+                    .flex()
+                    .flex_col().flex_shrink_0()
+                    .gap_2()
+                    .w_80()
+                    .p_8()
+                    .pr_0()
+                    .h_full()
+                    .bg(rgb(0x0D0D16))
+                    .child(
+                        div()
+                            .text_color(hsla(0.0, 0.0, 0.0, 0.0))
+                            .p_2()
+                            .pl_4()
+                            .w_72()
+                            .h_11()
+                            .bg(rgb(0x000000))
+                            .rounded_l_md()
+                            .absolute()
+                            .top(Rems(
+                                2.0 + (self
+                                    .tabs
+                                    .iter()
+                                    .position(|x| x == &self.active_tab)
+                                    .unwrap_or(0)) as f32
+                                    * 3.25,
+                            ))
+                            .child("Locator"),
                     )
-            }))
-            .child(match self.active_tab {
-                Tab::Home => div().child("Home page here"),
+                    .children(self.tabs.iter().map(|tab| {
+                        let tab_clone = tab.clone();
+                        div()
+                            .hover(|s| s.bg(rgb(0x101018)))
+                            .p_2()
+                            .pl_4()
+                            .h_11()
+                            .rounded_l_md()
+                            .child(tab.get_title())
+                            .cursor_pointer()
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(move |this, _ev, _window, _cx| {
+                                    this.active_tab = tab_clone;
+                                }),
+                            )
+                    })),
+            )
+            .child(div().flex_shrink().w_full().p_8().border_5().border_color(rgb(0xff00ff)).child(match self.active_tab {
+                Tab::Home => div().child("Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here"),
                 Tab::Settings => div().child("Settings page here"),
                 Tab::About => div().child("About page here"),
-            })
+            }))
     }
 }
