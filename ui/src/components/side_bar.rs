@@ -1,5 +1,5 @@
-use gpui::{IntoElement, MouseButton, Window, div, hsla, prelude::*, rgb};
-use ui::{ParentElement, Rems};
+use gpui::{IntoElement, Window, div, hsla, prelude::*, rgb};
+use ui::{ParentElement, Pixels, Rems, SharedString};
 
 #[derive(Clone, Copy, PartialEq)]
 enum Tab {
@@ -34,7 +34,7 @@ impl SideBar {
 }
 
 impl Render for SideBar {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div().text_color(rgb(0xffffff))
             .h_full().flex()
             .child(
@@ -69,7 +69,10 @@ impl Render for SideBar {
                     )
                     .children(self.tabs.iter().map(|tab| {
                         let tab_clone = tab.clone();
+                        let id_str = format!("tab-switch-{}", tab_clone.get_title());
+                        let ssid = SharedString::from(id_str);
                         div()
+                            .id(ssid)
                             .hover(|s| s.bg(rgb(0x101018)))
                             .p_2()
                             .pl_4()
@@ -77,15 +80,14 @@ impl Render for SideBar {
                             .rounded_l_md()
                             .child(tab.get_title())
                             .cursor_pointer()
-                            .on_mouse_down(
-                                MouseButton::Left,
+                            .on_click(
                                 cx.listener(move |this, _ev, _window, _cx| {
                                     this.active_tab = tab_clone;
                                 }),
                             )
                     })),
             )
-            .child(div().flex_shrink().w_full().p_8().border_5().border_color(rgb(0xff00ff)).child(match self.active_tab {
+            .child(div().flex_shrink().w(window.viewport_size().width - Pixels(320.0 + 2.0)).p_8().child(match self.active_tab {
                 Tab::Home => div().child("Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here"),
                 Tab::Settings => div().child("Settings page here"),
                 Tab::About => div().child("About page here"),
