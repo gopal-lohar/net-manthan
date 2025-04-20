@@ -42,7 +42,7 @@ fn main() {
             |_, cx| {
                 cx.new(|cx| NetManthanUi {
                     title_bar: cx.new(|_| TitleBar::new()),
-                    side_bar: cx.new(|_| SideBar::new()),
+                    side_bar: cx.new(|cx| SideBar::new(cx)),
                 })
             },
         )

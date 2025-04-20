@@ -1,5 +1,7 @@
-use gpui::{IntoElement, Window, div, hsla, prelude::*, rgb};
+use gpui::{Entity, IntoElement, Window, div, hsla, prelude::*, rgb};
 use ui::{ParentElement, Pixels, Rems, SharedString};
+
+use super::home::Home;
 
 #[derive(Clone, Copy, PartialEq)]
 enum Tab {
@@ -21,26 +23,31 @@ impl Tab {
 pub struct SideBar {
     tabs: Vec<Tab>,
     active_tab: Tab,
+    home: Entity<Home>,
 }
 
 impl SideBar {
-    pub fn new() -> Self {
+    pub fn new(cx: &mut Context<SideBar>) -> Self {
         let tabs = vec![Tab::Home, Tab::Settings, Tab::About];
         Self {
             tabs,
             active_tab: Tab::Home,
+            home: cx.new(|_| Home::new()),
         }
     }
 }
 
 impl Render for SideBar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div().text_color(rgb(0xffffff))
-            .h_full().flex()
+        div()
+            .text_color(rgb(0xffffff))
+            .h_full()
+            .flex()
             .child(
                 div()
                     .flex()
-                    .flex_col().flex_shrink_0()
+                    .flex_col()
+                    .flex_shrink_0()
                     .gap_2()
                     .w_80()
                     .p_8()
@@ -80,17 +87,21 @@ impl Render for SideBar {
                             .rounded_l_md()
                             .child(tab.get_title())
                             .cursor_pointer()
-                            .on_click(
-                                cx.listener(move |this, _ev, _window, _cx| {
-                                    this.active_tab = tab_clone;
-                                }),
-                            )
+                            .on_click(cx.listener(move |this, _ev, _window, _cx| {
+                                this.active_tab = tab_clone;
+                            }))
                     })),
             )
-            .child(div().flex_shrink().w(window.viewport_size().width - Pixels(320.0 + 2.0)).p_8().child(match self.active_tab {
-                Tab::Home => div().child("Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here Home page here Home page hereHome page here Home page here Home page here Home page here Home page here"),
-                Tab::Settings => div().child("Settings page here"),
-                Tab::About => div().child("About page here"),
-            }))
+            .child(
+                div()
+                    .flex_shrink()
+                    .w(window.viewport_size().width - Pixels(320.0 + 2.0))
+                    .p_8()
+                    .child(match self.active_tab {
+                        Tab::Home => div().child(self.home.clone()),
+                        Tab::Settings => div().child("Settings page here"),
+                        Tab::About => div().child("About page here"),
+                    }),
+            )
     }
 }
