@@ -6,11 +6,9 @@ use gpui::{
 };
 use ui::SharedString;
 
-use crate::components::side_bar::SideBar;
 use net_manthan_ui::NetManthanUi;
 use std::fs;
 use std::path::PathBuf;
-use title_bar::TitleBar;
 
 pub mod components;
 mod net_manthan_ui;
@@ -61,12 +59,7 @@ fn main() {
                     }),
                     ..Default::default()
                 },
-                |_, cx| {
-                    cx.new(|cx| NetManthanUi {
-                        title_bar: cx.new(|_| TitleBar::new()),
-                        side_bar: cx.new(|cx| SideBar::new(cx)),
-                    })
-                },
+                |_, cx| cx.new(|cx| NetManthanUi::new(cx)),
             )
             .unwrap();
         });
