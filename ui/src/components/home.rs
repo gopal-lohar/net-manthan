@@ -107,6 +107,55 @@ impl Render for Home {
                                 }),
                         ),
                 )
+                .child(
+                    div()
+                        .mt_2()
+                        .flex()
+                        .justify_between()
+                        .child(div().child(format!("{:.2}%", download.download_fraction() * 100.0)))
+                        .child(div().child(format!(
+                            "{}/{}",
+                            format_bytes(download.size_downloaded),
+                            format_bytes(download.total_size)
+                        ))),
+                )
+                .child(
+                    div()
+                        .mt_1()
+                        .h_2()
+                        .w_full()
+                        .bg(rgb(0x202030))
+                        .rounded_full()
+                        .child(
+                            div()
+                                .bg(rgb(0xff00ff))
+                                .h_full()
+                                .rounded_full()
+                                .w(DefiniteLength::Fraction(download.download_fraction())),
+                        ),
+                )
         }))
     }
+}
+
+pub fn format_bytes(bytes: u64) -> String {
+    const UNITS: [&str; 9] = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+    let mut size = bytes as f64;
+    let mut unit_index = 0;
+
+    while size >= 1024.0 && unit_index < UNITS.len() - 1 {
+        size /= 1024.0;
+        unit_index += 1;
+    }
+
+    let rounded = (size * 10.0).round() / 10.0;
+    let formatted = format!("{:.2}", rounded);
+
+    let cleaned = if formatted.ends_with(".0") {
+        &formatted[..formatted.len() - 2]
+    } else {
+        &formatted
+    };
+
+    format!("{}{}", cleaned, UNITS[unit_index])
 }
