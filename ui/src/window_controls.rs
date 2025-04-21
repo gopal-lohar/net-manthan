@@ -9,21 +9,6 @@ pub enum WindowControlType {
     Close,
 }
 
-impl WindowControlType {
-    /// Returns the icon name for the window control type.
-    ///
-    /// Will take a [PlatformStyle] in the future to return a different
-    /// icon name based on the platform.
-    pub fn icon(&self) -> IconName {
-        match self {
-            WindowControlType::Minimize => IconName::GenericMinimize,
-            WindowControlType::Restore => IconName::GenericRestore,
-            WindowControlType::Maximize => IconName::GenericMaximize,
-            WindowControlType::Close => IconName::GenericClose,
-        }
-    }
-}
-
 #[allow(unused)]
 pub struct WindowControlStyle {
     background: Hsla,
@@ -37,26 +22,26 @@ impl WindowControlStyle {
         Self {
             background: Hsla {
                 h: 0.0,
-                s: 1.0,
-                l: 0.5,
-                a: 1.0,
+                s: 0.0,
+                l: 0.,
+                a: 1.,
             },
             background_hover: Hsla {
-                h: 0.2,
-                s: 1.0,
-                l: 0.5,
-                a: 1.0,
+                h: 0.,
+                s: 0.,
+                l: 1.,
+                a: 0.025,
             },
             icon: Hsla {
-                h: 0.4,
-                s: 1.0,
-                l: 0.5,
+                h: 0.,
+                s: 0.,
+                l: 0.75,
                 a: 1.0,
             },
             icon_hover: Hsla {
-                h: 0.6,
-                s: 1.0,
-                l: 0.5,
+                h: 0.,
+                s: 0.,
+                l: 1.,
                 a: 1.0,
             },
         }
@@ -139,10 +124,10 @@ impl RenderOnce for WindowControl {
             .size_4()
             .flex_none()
             .path(match self.icon {
-                WindowControlType::Minimize => "<svg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'><path d='M9.5 6.5H3.5V12.5H9.5V6.5Z' stroke='#FBF1C7'/><path d='M10 8.5L12.5 8.5L12.5 3.5L7.5 3.5L7.5 6' stroke='#FBF1C7'/></svg>",
-                WindowControlType::Restore => "<svg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'><path d='M9.5 6.5H3.5V12.5H9.5V6.5Z' stroke='#FBF1C7'/><path d='M10 8.5L12.5 8.5L12.5 3.5L7.5 3.5L7.5 6' stroke='#FBF1C7'/></svg>",
-                WindowControlType::Maximize => "<svg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'><path d='M9.5 6.5H3.5V12.5H9.5V6.5Z' stroke='#FBF1C7'/><path d='M10 8.5L12.5 8.5L12.5 3.5L7.5 3.5L7.5 6' stroke='#FBF1C7'/></svg>",
-                WindowControlType::Close => "<svg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'><path d='M9.5 6.5H3.5V12.5H9.5V6.5Z' stroke='#FBF1C7'/><path d='M10 8.5L12.5 8.5L12.5 3.5L7.5 3.5L7.5 6' stroke='#FBF1C7'/></svg>",
+                WindowControlType::Minimize => "icons/generic_minimize.svg",
+                WindowControlType::Restore => "icons/generic_restore.svg",
+                WindowControlType::Maximize => "icons/generic_maximize.svg",
+                WindowControlType::Close => "icons/generic_close.svg",
             })
             .text_color(self.style.icon)
             .group_hover("", |this| this.text_color(self.style.icon_hover));
