@@ -22,7 +22,7 @@ impl TitleBar {
 
     #[cfg(not(target_os = "windows"))]
     pub fn height(window: &mut Window) -> Pixels {
-        (1.75 * window.rem_size()).max(px(34.))
+        (2. * window.rem_size()).max(px(34.))
     }
 
     #[cfg(target_os = "windows")]
@@ -44,7 +44,7 @@ impl Render for TitleBar {
         let height = Self::height(window);
 
         div()
-            .h_10()
+            .h(height + Pixels(1.))
             .flex()
             .items_center()
             .justify_between()

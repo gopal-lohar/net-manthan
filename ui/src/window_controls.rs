@@ -121,7 +121,7 @@ impl WindowControl {
 impl RenderOnce for WindowControl {
     fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
         let icon = svg()
-            .size_4()
+            .size_5()
             .flex_none()
             .path(match self.icon {
                 WindowControlType::Minimize => "icons/generic_minimize.svg",
