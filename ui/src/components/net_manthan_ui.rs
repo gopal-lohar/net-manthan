@@ -1,12 +1,11 @@
-use crate::components::side_bar::SideBar;
-use crate::title_bar::TitleBar;
+use crate::components::{downloads::Downloads, title_bar::TitleBar};
 
 use gpui::{Context, Entity, IntoElement, Window, div, prelude::*, rgb};
 use ui::PlatformStyle;
 
 pub struct NetManthanUi {
     pub title_bar: Entity<TitleBar>,
-    pub side_bar: Entity<SideBar>,
+    pub side_bar: Entity<Downloads>,
     pub platform_style: PlatformStyle,
 }
 
@@ -36,7 +35,7 @@ impl NetManthanUi {
         let platform_style = PlatformStyle::platform();
         Self {
             title_bar: cx.new(|_| TitleBar::new()),
-            side_bar: cx.new(|cx| SideBar::new(cx)),
+            side_bar: cx.new(|cx| Downloads::new(cx)),
             platform_style,
         }
     }

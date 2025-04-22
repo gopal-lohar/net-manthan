@@ -6,15 +6,12 @@ use gpui::{
 };
 use ui::SharedString;
 
-use net_manthan_ui::NetManthanUi;
+use components::net_manthan_ui::NetManthanUi;
 use std::fs;
 use std::path::PathBuf;
 
 pub mod components;
-mod net_manthan_ui;
 pub mod platforms;
-pub mod title_bar;
-pub mod window_controls;
 
 struct FsAssets {
     base: PathBuf,

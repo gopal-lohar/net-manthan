@@ -20,14 +20,14 @@ impl Tab {
     }
 }
 
-pub struct SideBar {
+pub struct Downloads {
     tabs: Vec<Tab>,
     active_tab: Tab,
     home: Entity<Home>,
 }
 
-impl SideBar {
-    pub fn new(cx: &mut Context<SideBar>) -> Self {
+impl Downloads {
+    pub fn new(cx: &mut Context<Downloads>) -> Self {
         let tabs = vec![Tab::Home, Tab::Settings, Tab::About];
         Self {
             tabs,
@@ -37,7 +37,7 @@ impl SideBar {
     }
 }
 
-impl Render for SideBar {
+impl Render for Downloads {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .text_color(rgb(0xffffff))
