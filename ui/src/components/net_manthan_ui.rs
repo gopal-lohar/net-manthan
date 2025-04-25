@@ -3,10 +3,13 @@ use crate::components::{downloads::Downloads, title_bar::TitleBar};
 use gpui::{Context, Entity, IntoElement, Window, div, prelude::*, rgb};
 use ui::PlatformStyle;
 
+use super::add_download_dialog::AddDownloadDialog;
+
 pub struct NetManthanUi {
     pub title_bar: Entity<TitleBar>,
     pub side_bar: Entity<Downloads>,
     pub platform_style: PlatformStyle,
+    pub add_download_dialog: Entity<AddDownloadDialog>,
 }
 
 impl Render for NetManthanUi {
@@ -27,16 +30,18 @@ impl Render for NetManthanUi {
             .text_color(rgb(0xffffff))
             .child(self.title_bar.clone())
             .child(self.side_bar.clone())
+            .child(self.add_download_dialog.clone())
     }
 }
 
 impl NetManthanUi {
-    pub fn new(cx: &mut Context<NetManthanUi>) -> Self {
+    pub fn new(_window: &mut Window, cx: &mut Context<NetManthanUi>) -> Self {
         let platform_style = PlatformStyle::platform();
         Self {
             title_bar: cx.new(|_| TitleBar::new()),
             side_bar: cx.new(|cx| Downloads::new(cx)),
             platform_style,
+            add_download_dialog: cx.new(|_| AddDownloadDialog::new()),
         }
     }
 }

@@ -56,7 +56,7 @@ fn main() {
                     }),
                     ..Default::default()
                 },
-                |_, cx| cx.new(|cx| NetManthanUi::new(cx)),
+                |window, cx| cx.new(|cx| NetManthanUi::new(window, cx)),
             )
             .unwrap();
         });
