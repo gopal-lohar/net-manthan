@@ -30,7 +30,6 @@ impl Render for NetManthanUi {
             .text_color(rgb(0xffffff))
             .child(self.title_bar.clone())
             .child(self.side_bar.clone())
-            .child(self.add_download_dialog.clone())
     }
 }
 

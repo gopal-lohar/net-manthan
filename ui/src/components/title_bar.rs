@@ -22,7 +22,7 @@ impl TitleBar {
 
     #[cfg(not(target_os = "windows"))]
     pub fn height(window: &mut Window) -> Pixels {
-        (2. * window.rem_size()).max(px(34.))
+        (2.25 * window.rem_size()).max(px(34.))
     }
 
     #[cfg(target_os = "windows")]
