@@ -52,13 +52,14 @@ impl Render for NetManthanUi {
 }
 
 impl NetManthanUi {
-    pub fn new(_window: &mut Window, cx: &mut Context<NetManthanUi>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<NetManthanUi>) -> Self {
         let platform_style = PlatformStyle::platform();
+        let title_bar_struct = TitleBar::new();
         Self {
-            title_bar: cx.new(|_| TitleBar::new()),
+            title_bar: cx.new(|_| title_bar_struct),
             side_bar: cx.new(|cx| Downloads::new(cx)),
             platform_style,
-            add_download_dialog: cx.new(|cx| AddDownloadDialog::new(cx)),
+            add_download_dialog: cx.new(|cx| AddDownloadDialog::new(cx, TitleBar::height(window))),
             show_add_download_dialog: false,
         }
     }

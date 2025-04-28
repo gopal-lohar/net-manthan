@@ -1,13 +1,14 @@
 use crate::components::text_input::TextInput;
 use gpui::{Entity, IntoElement, Window, div, hsla, prelude::*, rgb};
-use ui::Rems;
+use ui::{Pixels, Rems};
 
 pub struct AddDownloadDialog {
     url_input: Entity<TextInput>,
+    title_bar_height: Pixels,
 }
 
 impl AddDownloadDialog {
-    pub fn new(cx: &mut Context<Self>) -> Self {
+    pub fn new(cx: &mut Context<Self>, title_bar_height: Pixels) -> Self {
         let url_input = cx.new(|cx| TextInput {
             focus_handle: cx.focus_handle(),
             content: "".into(),
@@ -20,7 +21,10 @@ impl AddDownloadDialog {
             is_selecting: false,
         });
 
-        Self { url_input }
+        Self {
+            url_input,
+            title_bar_height,
+        }
     }
 }
 
@@ -28,7 +32,7 @@ impl Render for AddDownloadDialog {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .absolute()
-            .top_0()
+            .top(self.title_bar_height)
             .left_0()
             .w_full()
             .h_full()
