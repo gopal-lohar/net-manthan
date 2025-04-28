@@ -59,7 +59,7 @@ impl NetManthanUi {
             side_bar: cx.new(|cx| Downloads::new(cx)),
             platform_style,
             add_download_dialog: cx.new(|cx| AddDownloadDialog::new(cx)),
-            show_add_download_dialog: true,
+            show_add_download_dialog: false,
         }
     }
 

@@ -584,7 +584,7 @@ impl Render for TextInput {
                     .h(px(30. + 4. * 2.))
                     .w_full()
                     .p(px(4.))
-                    .bg(white())
+                    .bg(rgb(0x000000))
                     .child(TextElement {
                         input: cx.entity().clone(),
                     }),
