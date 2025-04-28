@@ -1,4 +1,3 @@
-use components::net_manthan_ui::NetManthanUi;
 use gpui::{
     App, Application, AssetSource, Bounds, ClipboardItem, Context, CursorStyle, ElementId,
     ElementInputHandler, Entity, EntityInputHandler, FocusHandle, Focusable, GlobalElementId,
@@ -13,9 +12,6 @@ use std::fs;
 use std::ops::Range;
 use std::path::PathBuf;
 use unicode_segmentation::*;
-
-pub mod components;
-pub mod platforms;
 
 actions!(
     text_input,
@@ -62,7 +58,7 @@ pub struct TextInput {
 }
 
 impl TextInput {
-    fn left(&mut self, _: &Left, _: &mut Window, cx: &mut Context<Self>) {
+    pub fn left(&mut self, _: &Left, _: &mut Window, cx: &mut Context<Self>) {
         if self.selected_range.is_empty() {
             self.move_to(self.previous_boundary(self.cursor_offset()), cx);
         } else {
@@ -70,7 +66,7 @@ impl TextInput {
         }
     }
 
-    fn right(&mut self, _: &Right, _: &mut Window, cx: &mut Context<Self>) {
+    pub fn right(&mut self, _: &Right, _: &mut Window, cx: &mut Context<Self>) {
         if self.selected_range.is_empty() {
             self.move_to(self.next_boundary(self.selected_range.end), cx);
         } else {
@@ -78,42 +74,42 @@ impl TextInput {
         }
     }
 
-    fn select_left(&mut self, _: &SelectLeft, _: &mut Window, cx: &mut Context<Self>) {
+    pub fn select_left(&mut self, _: &SelectLeft, _: &mut Window, cx: &mut Context<Self>) {
         self.select_to(self.previous_boundary(self.cursor_offset()), cx);
     }
 
-    fn select_right(&mut self, _: &SelectRight, _: &mut Window, cx: &mut Context<Self>) {
+    pub fn select_right(&mut self, _: &SelectRight, _: &mut Window, cx: &mut Context<Self>) {
         self.select_to(self.next_boundary(self.cursor_offset()), cx);
     }
 
-    fn select_all(&mut self, _: &SelectAll, _: &mut Window, cx: &mut Context<Self>) {
+    pub fn select_all(&mut self, _: &SelectAll, _: &mut Window, cx: &mut Context<Self>) {
         self.move_to(0, cx);
         self.select_to(self.content.len(), cx)
     }
 
-    fn home(&mut self, _: &Home, _: &mut Window, cx: &mut Context<Self>) {
+    pub fn home(&mut self, _: &Home, _: &mut Window, cx: &mut Context<Self>) {
         self.move_to(0, cx);
     }
 
-    fn end(&mut self, _: &End, _: &mut Window, cx: &mut Context<Self>) {
+    pub fn end(&mut self, _: &End, _: &mut Window, cx: &mut Context<Self>) {
         self.move_to(self.content.len(), cx);
     }
 
-    fn backspace(&mut self, _: &Backspace, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn backspace(&mut self, _: &Backspace, window: &mut Window, cx: &mut Context<Self>) {
         if self.selected_range.is_empty() {
             self.select_to(self.previous_boundary(self.cursor_offset()), cx)
         }
         self.replace_text_in_range(None, "", window, cx)
     }
 
-    fn delete(&mut self, _: &Delete, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn delete(&mut self, _: &Delete, window: &mut Window, cx: &mut Context<Self>) {
         if self.selected_range.is_empty() {
             self.select_to(self.next_boundary(self.cursor_offset()), cx)
         }
         self.replace_text_in_range(None, "", window, cx)
     }
 
-    fn on_mouse_down(
+    pub fn on_mouse_down(
         &mut self,
         event: &MouseDownEvent,
         _window: &mut Window,
@@ -128,17 +124,22 @@ impl TextInput {
         }
     }
 
-    fn on_mouse_up(&mut self, _: &MouseUpEvent, _window: &mut Window, _: &mut Context<Self>) {
+    pub fn on_mouse_up(&mut self, _: &MouseUpEvent, _window: &mut Window, _: &mut Context<Self>) {
         self.is_selecting = false;
     }
 
-    fn on_mouse_move(&mut self, event: &MouseMoveEvent, _: &mut Window, cx: &mut Context<Self>) {
+    pub fn on_mouse_move(
+        &mut self,
+        event: &MouseMoveEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.is_selecting {
             self.select_to(self.index_for_mouse_position(event.position), cx);
         }
     }
 
-    fn show_character_palette(
+    pub fn show_character_palette(
         &mut self,
         _: &ShowCharacterPalette,
         window: &mut Window,
@@ -147,20 +148,20 @@ impl TextInput {
         window.show_character_palette();
     }
 
-    fn paste(&mut self, _: &Paste, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn paste(&mut self, _: &Paste, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) {
             self.replace_text_in_range(None, &text.replace("\n", " "), window, cx);
         }
     }
 
-    fn copy(&mut self, _: &Copy, _: &mut Window, cx: &mut Context<Self>) {
+    pub fn copy(&mut self, _: &Copy, _: &mut Window, cx: &mut Context<Self>) {
         if !self.selected_range.is_empty() {
             cx.write_to_clipboard(ClipboardItem::new_string(
                 (&self.content[self.selected_range.clone()]).to_string(),
             ));
         }
     }
-    fn cut(&mut self, _: &Cut, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn cut(&mut self, _: &Cut, window: &mut Window, cx: &mut Context<Self>) {
         if !self.selected_range.is_empty() {
             cx.write_to_clipboard(ClipboardItem::new_string(
                 (&self.content[self.selected_range.clone()]).to_string(),
@@ -169,12 +170,12 @@ impl TextInput {
         }
     }
 
-    fn move_to(&mut self, offset: usize, cx: &mut Context<Self>) {
+    pub fn move_to(&mut self, offset: usize, cx: &mut Context<Self>) {
         self.selected_range = offset..offset;
         cx.notify()
     }
 
-    fn cursor_offset(&self) -> usize {
+    pub fn cursor_offset(&self) -> usize {
         if self.selection_reversed {
             self.selected_range.start
         } else {
@@ -182,7 +183,7 @@ impl TextInput {
         }
     }
 
-    fn index_for_mouse_position(&self, position: Point<Pixels>) -> usize {
+    pub fn index_for_mouse_position(&self, position: Point<Pixels>) -> usize {
         if self.content.is_empty() {
             return 0;
         }
@@ -200,7 +201,7 @@ impl TextInput {
         line.closest_index_for_x(position.x - bounds.left())
     }
 
-    fn select_to(&mut self, offset: usize, cx: &mut Context<Self>) {
+    pub fn select_to(&mut self, offset: usize, cx: &mut Context<Self>) {
         if self.selection_reversed {
             self.selected_range.start = offset
         } else {
@@ -213,7 +214,7 @@ impl TextInput {
         cx.notify()
     }
 
-    fn offset_from_utf16(&self, offset: usize) -> usize {
+    pub fn offset_from_utf16(&self, offset: usize) -> usize {
         let mut utf8_offset = 0;
         let mut utf16_count = 0;
 
@@ -228,7 +229,7 @@ impl TextInput {
         utf8_offset
     }
 
-    fn offset_to_utf16(&self, offset: usize) -> usize {
+    pub fn offset_to_utf16(&self, offset: usize) -> usize {
         let mut utf16_offset = 0;
         let mut utf8_count = 0;
 
@@ -243,15 +244,15 @@ impl TextInput {
         utf16_offset
     }
 
-    fn range_to_utf16(&self, range: &Range<usize>) -> Range<usize> {
+    pub fn range_to_utf16(&self, range: &Range<usize>) -> Range<usize> {
         self.offset_to_utf16(range.start)..self.offset_to_utf16(range.end)
     }
 
-    fn range_from_utf16(&self, range_utf16: &Range<usize>) -> Range<usize> {
+    pub fn range_from_utf16(&self, range_utf16: &Range<usize>) -> Range<usize> {
         self.offset_from_utf16(range_utf16.start)..self.offset_from_utf16(range_utf16.end)
     }
 
-    fn previous_boundary(&self, offset: usize) -> usize {
+    pub fn previous_boundary(&self, offset: usize) -> usize {
         self.content
             .grapheme_indices(true)
             .rev()
@@ -259,14 +260,14 @@ impl TextInput {
             .unwrap_or(0)
     }
 
-    fn next_boundary(&self, offset: usize) -> usize {
+    pub fn next_boundary(&self, offset: usize) -> usize {
         self.content
             .grapheme_indices(true)
             .find_map(|(idx, _)| (idx > offset).then_some(idx))
             .unwrap_or(self.content.len())
     }
 
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.content = "".into();
         self.selected_range = 0..0;
         self.selection_reversed = false;
@@ -618,10 +619,10 @@ impl Focusable for TextInput {
     }
 }
 
-struct InputExample {
-    text_input: Entity<TextInput>,
-    recent_keystrokes: Vec<Keystroke>,
-    focus_handle: FocusHandle,
+pub struct InputExample {
+    pub text_input: Entity<TextInput>,
+    pub recent_keystrokes: Vec<Keystroke>,
+    pub focus_handle: FocusHandle,
 }
 
 impl Focusable for InputExample {
@@ -684,95 +685,4 @@ impl Render for InputExample {
                 )
             }))
     }
-}
-
-fn main() {
-    Application::new()
-        .with_assets(FsAssets {
-            base: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets"),
-        })
-        .with_assets(FsAssets {
-            base: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets"),
-        })
-        .run(|cx: &mut App| {
-            let bounds = Bounds::centered(None, size(px(300.0), px(300.0)), cx);
-            cx.bind_keys([
-                KeyBinding::new("backspace", Backspace, None),
-                KeyBinding::new("delete", Delete, None),
-                KeyBinding::new("left", Left, None),
-                KeyBinding::new("right", Right, None),
-                KeyBinding::new("shift-left", SelectLeft, None),
-                KeyBinding::new("shift-right", SelectRight, None),
-                KeyBinding::new("cmd-a", SelectAll, None),
-                KeyBinding::new("cmd-v", Paste, None),
-                KeyBinding::new("cmd-c", Copy, None),
-                KeyBinding::new("cmd-x", Cut, None),
-                KeyBinding::new("home", Home, None),
-                KeyBinding::new("end", End, None),
-                KeyBinding::new("ctrl-cmd-space", ShowCharacterPalette, None),
-            ]);
-
-            let window = cx
-                .open_window(
-                    WindowOptions {
-                        titlebar: Some(TitlebarOptions {
-                            title: None,
-                            appears_transparent: true,
-                            traffic_light_position: Some(point(px(9.0), px(9.0))),
-                        }),
-                        window_bounds: None,
-                        focus: true,
-                        show: true,
-                        kind: WindowKind::Normal,
-                        is_movable: true,
-                        window_background: WindowBackgroundAppearance::Transparent,
-                        window_decorations: Some(gpui::WindowDecorations::Client),
-                        window_min_size: Some(gpui::Size {
-                            width: px(360.0),
-                            height: px(240.0),
-                        }),
-                        ..Default::default()
-                    },
-                    |_, cx| {
-                        let text_input = cx.new(|cx| TextInput {
-                            focus_handle: cx.focus_handle(),
-                            content: "".into(),
-                            placeholder: "Type here...".into(),
-                            selected_range: 0..0,
-                            selection_reversed: false,
-                            marked_range: None,
-                            last_layout: None,
-                            last_bounds: None,
-                            is_selecting: false,
-                        });
-                        cx.new(|cx| InputExample {
-                            text_input,
-                            recent_keystrokes: vec![],
-                            focus_handle: cx.focus_handle(),
-                        })
-                    },
-                )
-                .unwrap();
-            let view = window.update(cx, |_, _, cx| cx.entity()).unwrap();
-            cx.observe_keystrokes(move |ev, _, cx| {
-                view.update(cx, |view, cx| {
-                    view.recent_keystrokes.push(ev.keystroke.clone());
-                    cx.notify();
-                })
-            })
-            .detach();
-            cx.on_keyboard_layout_change({
-                move |cx| {
-                    window.update(cx, |_, _, cx| cx.notify()).ok();
-                }
-            })
-            .detach();
-
-            window
-                .update(cx, |view, window, cx| {
-                    window.focus(&view.text_input.focus_handle(cx));
-                    cx.activate(true);
-                })
-                .unwrap();
-        });
 }
