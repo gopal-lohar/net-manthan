@@ -29,8 +29,9 @@ impl AddDownloadDialog {
 }
 
 impl Render for AddDownloadDialog {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
+            .id("add-download-dialog-backdrop")
             .absolute()
             .top(self.title_bar_height)
             .left_0()
@@ -40,18 +41,53 @@ impl Render for AddDownloadDialog {
             .flex()
             .items_center()
             .justify_center()
+            .on_click(cx.listener(move |_this, _ev, _window, cx| {
+                cx.stop_propagation();
+            }))
+            .on_mouse_move(cx.listener(move |_this, _ev, _window, cx| {
+                cx.stop_propagation();
+            }))
             .child(
                 div()
                     .bg(rgb(0x000000))
                     .border_1()
+                    .mb_40()
                     .border_color(rgb(0x30303f))
-                    .max_w(Rems(25.))
+                    .w(Rems(25.))
+                    .child(div().px_4().py_2().text_center().child("Add Download"))
                     .child(
                         div()
                             .px_4()
-                            .px_2()
-                            .child("Add Download")
-                            .child(self.url_input.clone()),
+                            .child(
+                                div().child("URL").child(
+                                    div()
+                                        .border_1()
+                                        .border_color(rgb(0xf0f0f0))
+                                        .child(self.url_input.clone()),
+                                ),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .justify_between()
+                                    .py_4()
+                                    .child(
+                                        div()
+                                            .px_4()
+                                            .py_2()
+                                            .bg(rgb(0xa00000))
+                                            .rounded_md()
+                                            .child("cancel"),
+                                    )
+                                    .child(
+                                        div()
+                                            .px_4()
+                                            .py_2()
+                                            .bg(rgb(0x00a000))
+                                            .rounded_md()
+                                            .child("Add"),
+                                    ),
+                            ),
                     ),
             )
     }
