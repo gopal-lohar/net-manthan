@@ -2,3 +2,6 @@
 resolver = "3"
 members = ["ui"]
 exclude = ["extensions", "net-manthan-app"]
+
+[workspace.dependencies]
+anyhow = "1.0.98"
