@@ -1,4 +1,6 @@
 use components::{net_manthan_ui::NetManthanUi, text_input::*};
+use tracing::info;
+use utils::logging;
 
 use gpui::{
     App, Application, AssetSource, KeyBinding, SharedString, TitlebarOptions,
@@ -25,6 +27,14 @@ impl AssetSource for FsAssets {
 }
 
 fn main() {
+    match logging::init_logger("Net Manthan", PathBuf::from(".dev")) {
+        Ok(_) => (),
+        Err(e) => {
+            eprintln!("Failed to initialize logger: {}", e);
+        }
+    }
+
+    info!("Starting the GPUI application");
     Application::new()
         .with_assets(FsAssets {
             base: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets"),
@@ -47,7 +57,6 @@ fn main() {
                 KeyBinding::new("ctrl-cmd-space", ShowCharacterPalette, None),
             ]);
 
-            // TODO: Initialize logging
             // TODO: Start the server/daemon
             // TODO: Initialize the settings and adapt some things like default window size etc.
             let window = cx
