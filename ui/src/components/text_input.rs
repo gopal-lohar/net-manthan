@@ -245,6 +245,7 @@ impl TextInput {
             .unwrap_or(self.content.len())
     }
 
+    #[allow(unused)]
     fn reset(&mut self) {
         self.content = "".into();
         self.selected_range = 0..0;
