@@ -125,6 +125,7 @@ pub fn get_ui_config(log_dir: &str) -> LogConfig {
         silent_deps: vec![
             "naga".to_string(),
             "blade_graphics".to_string(),
+            "Users".to_string(),
             "cosmic_text".to_string(),
             "polling".to_string(),
             "mio".to_string(),

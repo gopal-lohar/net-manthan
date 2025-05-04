@@ -1,6 +1,6 @@
 use components::{net_manthan_ui::NetManthanUi, text_input::*};
 use tracing::info;
-use utils::logging::{init_logging, Component, get_ui_config};
+use utils::logging::{Component, get_ui_config, init_logging};
 
 use gpui::{
     App, Application, AssetSource, KeyBinding, SharedString, TitlebarOptions,
@@ -16,6 +16,16 @@ pub mod platforms;
 
 struct FsAssets {
     base: PathBuf,
+}
+
+#[cfg(not(target_os = "windows"))]
+fn net_manthan_path() -> &'static str {
+    "./target/debug/net-manthan"
+}
+
+#[cfg(target_os = "windows")]
+fn net_manthan_path() -> &'static str {
+    ".\\target\\debug\\net-manthan.exe"
 }
 
 impl AssetSource for FsAssets {
@@ -39,7 +49,7 @@ fn main() {
     }
 
     // NOTE: ui/build.rs builds debug and we run debug here
-    let mut _child = Command::new("./target/debug/net-manthan")
+    let mut _child = Command::new(net_manthan_path())
         .spawn()
         .expect("Failed to start net-manthan");
 
