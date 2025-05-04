@@ -43,7 +43,7 @@ impl Default for LogConfig {
         Self {
             component: Component::Ui,
             log_dir: PathBuf::from("logs"),
-            max_level: Level::INFO,
+            max_level: Level::TRACE,
             log_to_console: true,
             env_filter: None,
             silent_deps: Vec::new(),
@@ -116,4 +116,24 @@ fn build_filter(config: &LogConfig) -> Result<EnvFilter, Box<dyn std::error::Err
     }
 
     Ok(filter)
+}
+
+pub fn get_ui_config(log_dir: &str) -> LogConfig {
+    LogConfig {
+        component: Component::Ui,
+        log_dir: log_dir.into(),
+        silent_deps: vec![
+            "naga".to_string(),
+            "blade_graphics".to_string(),
+            "cosmic_text".to_string(),
+            "polling".to_string(),
+            "mio".to_string(),
+            "perform".to_string(),
+            "async_io".to_string(),
+            "zbus".to_string(),
+            "calloop".to_string(),
+            "gpui".to_string(),
+        ],
+        ..Default::default()
+    }
 }

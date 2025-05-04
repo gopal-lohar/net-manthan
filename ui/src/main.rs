@@ -1,6 +1,6 @@
 use components::{net_manthan_ui::NetManthanUi, text_input::*};
 use tracing::info;
-use utils::logging::{self, Component, LogConfig};
+use utils::logging::{init_logging, Component, get_ui_config};
 
 use gpui::{
     App, Application, AssetSource, KeyBinding, SharedString, TitlebarOptions,
@@ -29,12 +29,7 @@ impl AssetSource for FsAssets {
 
 fn main() {
     // Initialize logging
-    match logging::init_logging(LogConfig {
-        component: Component::Ui,
-        log_dir: ".dev/logs".into(),
-        silent_deps: vec!["naga".to_string(), "blade_graphics".to_string()],
-        ..Default::default()
-    }) {
+    match init_logging(get_ui_config(".dev/logs")) {
         Ok(_) => {
             info!("Logger initialized for {}", Component::Ui.as_str());
         }

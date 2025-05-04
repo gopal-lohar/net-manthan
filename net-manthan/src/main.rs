@@ -10,7 +10,6 @@ async fn main() {
     match logging::init_logging(LogConfig {
         component: Component::NetManthan,
         log_dir: ".dev/logs".into(),
-        silent_deps: vec!["naga".to_string(), "blade_graphics".to_string()],
         ..Default::default()
     }) {
         Ok(_) => {
