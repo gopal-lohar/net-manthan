@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use tokio;
 use tracing::info;
 use utils::logging::{self, Component, LogConfig};
@@ -12,12 +14,14 @@ async fn main() {
         ..Default::default()
     }) {
         Ok(_) => {
-            info!("Logger initialized for {}", Component::Ui.as_str());
+            info!("Logger initialized for {}", Component::NetManthan.as_str());
         }
         Err(e) => {
             eprintln!("Failed to initialize logger: {}", e);
         }
     }
 
-    info!("Starting Net Manthan");
+    tokio::time::sleep(Duration::from_secs(10)).await;
+
+    info!("Net Manthan Finished.");
 }
