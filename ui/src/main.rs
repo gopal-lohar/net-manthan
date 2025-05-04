@@ -1,6 +1,6 @@
 use components::{net_manthan_ui::NetManthanUi, text_input::*};
 use tracing::info;
-use utils::logging;
+use utils::logging::{self, Component, LogConfig};
 
 use gpui::{
     App, Application, AssetSource, KeyBinding, SharedString, TitlebarOptions,
@@ -28,13 +28,22 @@ impl AssetSource for FsAssets {
 }
 
 fn main() {
-    match logging::init_logger("Net Manthan", PathBuf::from(".dev")) {
-        Ok(_) => (),
+    // Initialize logging
+    match logging::init_logging(LogConfig {
+        component: Component::Ui,
+        log_dir: ".dev/logs".into(),
+        silent_deps: vec!["naga".to_string(), "blade_graphics".to_string()],
+        ..Default::default()
+    }) {
+        Ok(_) => {
+            info!("Logger initialized for {}", Component::Ui.as_str());
+        }
         Err(e) => {
             eprintln!("Failed to initialize logger: {}", e);
         }
     }
 
+    // TODO: fix the path (dev or release?)
     let mut child = Command::new("./target/release/net-manthan")
         .spawn()
         .expect("Failed to start net-manthan");

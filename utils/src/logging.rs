@@ -1,49 +1,119 @@
 use std::path::PathBuf;
-use tracing::info;
+use std::sync::Once;
+use tracing::Level;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
-use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{EnvFilter, Layer, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
-// TODO: make envFilter dynamic and remove the default log, instead we'll do it in where we use
-/// Initialize a basic logging system with console and file output
-pub fn init_logger(app_name: &str, log_dir: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    std::fs::create_dir_all(&log_dir)?;
+// Global initialization guard
+static INIT: Once = Once::new();
 
-    // Set up a file appender with daily rotation
-    let file_appender =
-        RollingFileAppender::new(Rotation::DAILY, log_dir, format!("{}.log", app_name));
+/// Application component identifier
+pub enum Component {
+    Ui,
+    NetManthan,
+}
 
-    // Create a non-blocking writer
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+impl Component {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Component::Ui => "ui",
+            Component::NetManthan => "net-manthan",
+        }
+    }
+}
 
-    // Important: we need to store this guard to keep the logger working
-    // Using a global static or Box::leak
-    Box::leak(Box::new(_guard));
+/// Configuration for logging initialization
+pub struct LogConfig {
+    /// Component name for log identification
+    pub component: Component,
+    /// Directory where log files will be stored
+    pub log_dir: PathBuf,
+    /// Maximum log level
+    pub max_level: Level,
+    /// Whether to also log to stdout
+    pub log_to_console: bool,
+    /// Optional custom env filter string
+    pub env_filter: Option<String>,
+    /// List of dependency crates to silence
+    pub silent_deps: Vec<String>,
+}
 
-    // Create a layer for terminal output
-    let terminal_layer = fmt::layer().with_ansi(true).with_target(true);
+impl Default for LogConfig {
+    fn default() -> Self {
+        Self {
+            component: Component::Ui,
+            log_dir: PathBuf::from("logs"),
+            max_level: Level::INFO,
+            log_to_console: true,
+            env_filter: None,
+            silent_deps: Vec::new(),
+        }
+    }
+}
 
-    // Create a layer for file output
-    let file_layer = fmt::layer()
-        .with_ansi(false)
-        .with_target(true)
-        .with_writer(non_blocking);
+/// Initialize logging for the application
+pub fn init_logging(config: LogConfig) -> Result<(), Box<dyn std::error::Error>> {
+    let mut result = Ok(());
 
-    // Create a filter based on RUST_LOG env var or default to info
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        EnvFilter::new(format!(
-            "{}=info,ui=info,net_manthan=info",
-            env!("CARGO_PKG_NAME")
-        ))
+    INIT.call_once(|| {
+        result = match initialize_logging_internal(config) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        };
     });
 
-    // Install both layers with a single init call
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(terminal_layer)
-        .with(file_layer)
-        .init();
+    result
+}
 
-    info!("Logging initialized");
+fn initialize_logging_internal(config: LogConfig) -> Result<(), Box<dyn std::error::Error>> {
+    // Create log directory if it doesn't exist
+    std::fs::create_dir_all(&config.log_dir)?;
+
+    // Set up file logging
+    let file_appender = RollingFileAppender::new(
+        Rotation::DAILY,
+        &config.log_dir,
+        format!("{}.log", config.component.as_str()),
+    );
+
+    // Start with a file layer
+    let mut layers = Vec::new();
+    let file_layer = fmt::Layer::new()
+        .with_ansi(false)
+        .with_writer(file_appender)
+        .with_target(true);
+
+    // Add console layer if configured
+    if config.log_to_console {
+        let stdout_layer = fmt::Layer::new()
+            .with_ansi(true)
+            .with_target(true)
+            .compact();
+
+        layers.push(stdout_layer.with_filter(build_filter(&config)?).boxed());
+    }
+
+    // Add file layer
+    layers.push(file_layer.with_filter(build_filter(&config)?).boxed());
+
+    // Initialize with all the layers
+    tracing_subscriber::registry().with(layers).try_init()?;
 
     Ok(())
+}
+
+fn build_filter(config: &LogConfig) -> Result<EnvFilter, Box<dyn std::error::Error>> {
+    let mut filter = if let Some(filter_str) = &config.env_filter {
+        EnvFilter::try_new(filter_str)?
+    } else {
+        EnvFilter::try_new(format!("{}", config.max_level))?
+            .add_directive(format!("{}={}", config.component.as_str(), config.max_level).parse()?)
+    };
+
+    // Apply silencing for noisy dependencies
+    for dep in &config.silent_deps {
+        filter = filter.add_directive(format!("{}=error", dep).parse()?);
+    }
+
+    Ok(filter)
 }
