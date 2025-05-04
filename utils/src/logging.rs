@@ -3,6 +3,7 @@ use tracing::info;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
+// TODO: make envFilter dynamic and remove the default log, instead we'll do it in where we use
 /// Initialize a basic logging system with console and file output
 pub fn init_logger(app_name: &str, log_dir: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(&log_dir)?;
@@ -28,8 +29,12 @@ pub fn init_logger(app_name: &str, log_dir: PathBuf) -> Result<(), Box<dyn std::
         .with_writer(non_blocking);
 
     // Create a filter based on RUST_LOG env var or default to info
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(format!("{}=info,ui=info", env!("CARGO_PKG_NAME"))));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        EnvFilter::new(format!(
+            "{}=info,ui=info,net_manthan=info",
+            env!("CARGO_PKG_NAME")
+        ))
+    });
 
     // Install both layers with a single init call
     tracing_subscriber::registry()

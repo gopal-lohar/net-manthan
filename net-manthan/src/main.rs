@@ -5,12 +5,12 @@ use utils::logging;
 
 #[tokio::main]
 async fn main() {
+    println!("Hello, world!");
     match logging::init_logger("Net Manthan", PathBuf::from(".dev")) {
         Ok(_) => (),
         Err(e) => {
             eprintln!("Failed to initialize logger: {}", e);
         }
     }
-
     info!("Starting Net Manthan");
 }

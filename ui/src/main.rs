@@ -9,6 +9,7 @@ use gpui::{
 use std::borrow::Cow;
 use std::fs;
 use std::path::PathBuf;
+use std::process::Command;
 
 pub mod components;
 pub mod platforms;
@@ -33,6 +34,11 @@ fn main() {
             eprintln!("Failed to initialize logger: {}", e);
         }
     }
+
+    let mut child = Command::new("./target/release/net-manthan")
+        .spawn()
+        .expect("Failed to start net-manthan");
+    child.wait().expect("Process didn't finish");
 
     info!("Starting the GPUI application");
     Application::new()
