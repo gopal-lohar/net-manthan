@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+download_engine = {path = "../download_engine"}
 utils = { path = "../utils" }
 tokio.workspace = true
 tracing.workspace = true

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["net-manthan", "ui", "utils"]
+members = [ "download_engine","net-manthan", "ui", "utils"]
 exclude = ["extensions", "net-manthan-app"]
 
 [workspace.dependencies]

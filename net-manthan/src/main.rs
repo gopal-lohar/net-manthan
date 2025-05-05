@@ -1,7 +1,6 @@
-use std::time::Duration;
-
+use download_engine::download_config::DownloadConfig;
 use tokio;
-use tracing::info;
+use tracing::{debug, info};
 use utils::logging::{self, Component, LogConfig};
 
 #[tokio::main]
@@ -20,7 +19,7 @@ async fn main() {
         }
     }
 
-    tokio::time::sleep(Duration::from_secs(10)).await;
-
+    let download_config = DownloadConfig::default();
+    debug!("download_config = {:?}", download_config);
     info!("Net Manthan Finished.");
 }
