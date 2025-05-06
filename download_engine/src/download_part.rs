@@ -2,10 +2,15 @@ use crate::types::DownloadStatus;
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
-pub enum DownloadPart {
+pub enum DownloadParts {
     Resumable(Vec<ResumableDownloadPart>),
     NonResumable(NonResumableDownloadPart),
     None,
+}
+
+pub enum DownloadPart {
+    Resumable(ResumableDownloadPart),
+    NonResumable(NonResumableDownloadPart),
 }
 
 #[derive(Clone, Debug)]

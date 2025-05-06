@@ -3,14 +3,13 @@ use crate::errors::DownloadError;
 use crate::types::DownloadRequest;
 use crate::utils::{calculate_chunks, extract_filename};
 use crate::{NonResumableDownloadPart, ResumableDownloadPart};
-use crate::{download_part::DownloadPart, types::DownloadStatus, utils::format_speed};
+use crate::{download_part::DownloadParts, types::DownloadStatus, utils::format_speed};
 use chrono::{DateTime, Duration, Utc};
 use reqwest::{Client, header};
 use std::{
     path::PathBuf,
     sync::{Arc, atomic::AtomicBool},
 };
-use tracing::debug;
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
@@ -21,6 +20,8 @@ pub struct Download {
     pub url: String,
     /// File path where the download will be saved.
     pub file: PathBuf,
+    /// Headers for the download.
+    pub headers: Option<Vec<String>>,
     /// Referrer URL for the download.
     pub referrer: Option<String>,
     /// chrono DateTime when the download was added.
@@ -34,7 +35,7 @@ pub struct Download {
     /// configuration options for the download.
     pub config: DownloadConfig,
     /// Parts of the download.
-    pub parts: DownloadPart,
+    pub parts: DownloadParts,
 }
 
 impl Download {
@@ -51,13 +52,14 @@ impl Download {
                 // the following case is handled in the load_download_info method
                 None => "".into(),
             }),
+            headers: request.headers,
             referrer: request.referrer,
             date_added: Utc::now(),
             active_time: Duration::zero(),
             status: DownloadStatus::Created,
             stop_token: Arc::new(AtomicBool::new(false)),
             config: config.clone(),
-            parts: DownloadPart::None,
+            parts: DownloadParts::None,
         }
     }
 
@@ -108,7 +110,7 @@ impl Download {
         self.file.push(file);
 
         self.parts = if resume {
-            DownloadPart::Resumable(
+            DownloadParts::Resumable(
                 calculate_chunks(total_size, self.config.connections_per_server as u64)
                     .iter()
                     .map(|(start_byte, end_byte)| ResumableDownloadPart {
@@ -122,7 +124,7 @@ impl Download {
                     .collect(),
             )
         } else {
-            DownloadPart::NonResumable(NonResumableDownloadPart {
+            DownloadParts::NonResumable(NonResumableDownloadPart {
                 id: Uuid::new_v4(),
                 status: DownloadStatus::Queued,
                 total_size,
@@ -142,25 +144,25 @@ impl Download {
 
     pub fn get_total_size(&self) -> u64 {
         match &self.parts {
-            DownloadPart::Resumable(parts) => parts.iter().map(|part| part.get_total_size()).sum(),
-            DownloadPart::NonResumable(part) => part.total_size,
-            DownloadPart::None => 0,
+            DownloadParts::Resumable(parts) => parts.iter().map(|part| part.get_total_size()).sum(),
+            DownloadParts::NonResumable(part) => part.total_size,
+            DownloadParts::None => 0,
         }
     }
 
     pub fn get_bytes_downloaded(&self) -> u64 {
         match &self.parts {
-            DownloadPart::Resumable(parts) => parts.iter().map(|part| part.bytes_downloaded).sum(),
-            DownloadPart::NonResumable(part) => part.bytes_downloaded,
-            DownloadPart::None => 0,
+            DownloadParts::Resumable(parts) => parts.iter().map(|part| part.bytes_downloaded).sum(),
+            DownloadParts::NonResumable(part) => part.bytes_downloaded,
+            DownloadParts::None => 0,
         }
     }
 
     pub fn get_current_speed(&self) -> usize {
         match &self.parts {
-            DownloadPart::Resumable(parts) => parts.iter().map(|part| part.current_speed).sum(),
-            DownloadPart::NonResumable(part) => part.current_speed,
-            DownloadPart::None => 0,
+            DownloadParts::Resumable(parts) => parts.iter().map(|part| part.current_speed).sum(),
+            DownloadParts::NonResumable(part) => part.current_speed,
+            DownloadParts::None => 0,
         }
     }
 
@@ -204,7 +206,7 @@ impl Download {
 
     pub fn get_status(&self) -> DownloadStatus {
         match &self.parts {
-            DownloadPart::Resumable(parts) => {
+            DownloadParts::Resumable(parts) => {
                 // If there are no parts, return the current status
                 if parts.is_empty() {
                     return self.status.clone();
@@ -281,8 +283,8 @@ impl Download {
                 self.status.clone()
             }
 
-            DownloadPart::NonResumable(part) => part.status.clone(),
-            DownloadPart::None => DownloadStatus::Created,
+            DownloadParts::NonResumable(part) => part.status.clone(),
+            DownloadParts::None => DownloadStatus::Created,
         }
     }
 }
