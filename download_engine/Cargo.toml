@@ -4,5 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+tracing.workspace = true
 chrono = { version = "0.4.41", features = ["serde"] }
-uuid = {version = "1.16.0", features=["v4"]}
+reqwest = "0.12.15"
+thiserror = "2.0.12"
+uuid = { version = "1.16.0", features = ["v4"] }
+url = "2.5.4"

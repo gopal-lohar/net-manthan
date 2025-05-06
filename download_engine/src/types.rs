@@ -17,7 +17,7 @@ pub enum DownloadStatus {
 pub struct DownloadRequest {
     pub url: String,
     pub file_dir: PathBuf,
-    pub file_name: Option<String>,
+    pub file_name: Option<PathBuf>,
     pub referrer: Option<String>,
     pub headers: Option<Vec<String>>,
 }

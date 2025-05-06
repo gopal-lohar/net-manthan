@@ -12,7 +12,6 @@ pub enum DownloadPart {
 pub struct ResumableDownloadPart {
     pub id: Uuid,
     pub status: DownloadStatus,
-    pub retry_count: usize,
     pub start_byte: u64,
     pub end_byte: u64,
     pub bytes_downloaded: u64,
@@ -29,7 +28,6 @@ impl ResumableDownloadPart {
 pub struct NonResumableDownloadPart {
     pub id: Uuid,
     pub status: DownloadStatus,
-    pub retry_count: usize,
     pub total_size: u64,
     pub bytes_downloaded: u64,
     pub current_speed: usize,

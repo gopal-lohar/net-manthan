@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DownloadConfig {
     pub buffer_size: usize,
     pub update_interval: usize,
