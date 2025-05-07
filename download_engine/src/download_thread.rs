@@ -1,24 +1,61 @@
-use crate::{Download, DownloadPart, errors::DownloadError, open_file_writer::open_file_writer};
+use crate::{
+    Download, DownloadPart, DownloadParts, errors::DownloadError,
+    open_file_writer::open_file_writer, utils::format_speed,
+};
 use futures_util::StreamExt;
 use reqwest::{
     Client,
     header::{self, HeaderMap, HeaderName, HeaderValue},
 };
 use tokio::io::AsyncWriteExt;
+use tracing::{error, info, trace};
 
 impl Download {
     pub async fn start(&self) -> Result<(), DownloadError> {
+        match &self.parts {
+            DownloadParts::NonResumable(part) => {
+                let me = self.clone();
+                let part = DownloadPart::NonResumable(part.clone());
+                tokio::spawn(async move {
+                    match me.download(part).await {
+                        Ok(_) => info!("Download completed"),
+                        Err(e) => error!("Download failed: {}", e),
+                    }
+                });
+            }
+            DownloadParts::Resumable(parts) => {
+                parts.iter().for_each(|part| {
+                    let me = self.clone();
+                    let part = DownloadPart::Resumable(part.clone());
+                    tokio::task::spawn(async move {
+                        match me.download(part).await {
+                            Ok(_) => info!("Download completed"),
+                            Err(e) => error!("Download failed: {}", e),
+                        }
+                    });
+                });
+            }
+            DownloadParts::None => {}
+        }
         Ok(())
     }
 
-    async fn download(&self, part: DownloadPart) -> Result<(), DownloadError> {
+    async fn download(self, part: DownloadPart) -> Result<(), DownloadError> {
+        trace!("Opening writer");
         let mut writer = match open_file_writer(
             self.file.clone(),
             match &part {
                 DownloadPart::Resumable(part) => part.bytes_downloaded,
                 DownloadPart::NonResumable(_) => 0,
             },
-            move || {},
+            self.config.buffer_size,
+            Box::new(move |bytes_flushed| {
+                info!(
+                    "Downloaded {} bytes which is = {}",
+                    bytes_flushed,
+                    format_speed(bytes_flushed as u64)
+                );
+            }),
         )
         .await
         {
@@ -87,6 +124,8 @@ impl Download {
                 }
             }
         }
+
+        writer.flush().await?;
 
         Ok(())
     }

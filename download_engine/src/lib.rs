@@ -1,3 +1,4 @@
+pub mod buf_writer_on_flush;
 pub mod download;
 pub mod download_config;
 pub mod download_part;

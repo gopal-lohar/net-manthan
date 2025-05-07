@@ -9,7 +9,7 @@ pub struct DownloadConfig {
 impl Default for DownloadConfig {
     fn default() -> Self {
         Self {
-            buffer_size: 1024,
+            buffer_size: 1024 * 1024,
             update_interval: 500,
             retry_count: 3,
             connections_per_server: 10,

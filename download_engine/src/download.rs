@@ -20,6 +20,8 @@ pub struct Download {
     pub url: String,
     /// File path where the download will be saved.
     pub file: PathBuf,
+    /// file name for customization (comes from request and useless after load_download_info)
+    pub file_name: Option<PathBuf>,
     /// Headers for the download.
     pub headers: Option<Vec<String>>,
     /// Referrer URL for the download.
@@ -47,11 +49,8 @@ impl Download {
         Self {
             id,
             url: request.url,
-            file: request.file_dir.join(match request.file_name.clone() {
-                Some(name) => name,
-                // the following case is handled in the load_download_info method
-                None => "".into(),
-            }),
+            file: request.file_dir,
+            file_name: request.file_name,
             headers: request.headers,
             referrer: request.referrer,
             date_added: Utc::now(),
@@ -86,17 +85,13 @@ impl Download {
         // the response headers
         // or from the URL
         // or a fallback name using the download ID
-        let mut file = match self.file.file_name() {
+        let mut file = match &self.file_name {
             Some(name) => name.into(),
             None => match extract_filename(response.headers(), &self.url) {
                 Some(name) => name,
                 None => format!("net-manthan-download-{}", self.id).into(),
             },
         };
-
-        if self.file.file_name().is_some() {
-            self.file.pop();
-        }
 
         let new_extension = match file.extension() {
             Some(ext) => {

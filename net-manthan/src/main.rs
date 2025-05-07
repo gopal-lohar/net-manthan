@@ -41,28 +41,49 @@ async fn main() {
         }
     }
 
-    let mut download_docker = Download::new(
-        DownloadRequest {
-            url: "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
-                .to_string(),
-            file_dir: "/tmp/".into(),
-            file_name: None,
-            referrer: None,
-            headers: None,
-        },
-        &download_config,
-    );
-
-    match download_docker.load_download_info().await {
+    match download_windows.start().await {
         Ok(_) => {
-            info!("Download info loaded successfully");
+            info!("Download started successfully");
         }
         Err(e) => {
-            error!("Failed to load download info: {}", e);
+            error!("Failed to start download: {}", e);
         }
     }
 
-    debug!("download_docker = {:?}", download_docker);
+    // let mut download_docker = Download::new(
+    //     DownloadRequest {
+    //         url: "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
+    //             .to_string(),
+    //         file_dir: "/tmp/".into(),
+    //         file_name: None,
+    //         referrer: None,
+    //         headers: None,
+    //     },
+    //     &download_config,
+    // );
+
+    // match download_docker.load_download_info().await {
+    //     Ok(_) => {
+    //         info!("Download info loaded successfully");
+    //     }
+    //     Err(e) => {
+    //         error!("Failed to load download info: {}", e);
+    //     }
+    // }
+
+    // // TODO: handle not loaded gracefully
+    // match download_docker.start().await {
+    //     Ok(_) => {
+    //         info!("Download started successfully");
+    //     }
+    //     Err(e) => {
+    //         error!("Failed to start download: {}", e);
+    //     }
+    // }
+
+    // debug!("download_docker = {:?}", download_docker);
 
     info!("Net Manthan Finished.");
+
+    loop {}
 }
