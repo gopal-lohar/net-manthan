@@ -1,4 +1,7 @@
+use std::sync::Arc;
+
 use crate::types::DownloadStatus;
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
@@ -8,9 +11,23 @@ pub enum DownloadParts {
     None,
 }
 
+#[derive(Clone, Debug)]
+pub enum DownloadPartsProgress {
+    Resumable(Vec<Arc<Mutex<ResumableDownloadPart>>>),
+    NonResumable(Arc<Mutex<NonResumableDownloadPart>>),
+    None,
+}
+
+#[derive(Clone, Debug)]
 pub enum DownloadPart {
     Resumable(ResumableDownloadPart),
     NonResumable(NonResumableDownloadPart),
+}
+
+#[derive(Clone, Debug)]
+pub enum DownloadProgressPart {
+    Resumable(Arc<Mutex<ResumableDownloadPart>>),
+    NonResumable(Arc<Mutex<NonResumableDownloadPart>>),
 }
 
 #[derive(Clone, Debug)]

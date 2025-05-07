@@ -1,21 +1,24 @@
+use std::sync::Arc;
+
 use crate::{
-    Download, DownloadPart, DownloadParts, errors::DownloadError,
-    open_file_writer::open_file_writer, utils::format_speed,
+    Download, DownloadPartsProgress, DownloadProgressPart, errors::DownloadError,
+    open_file_writer::open_file_writer,
 };
+use chrono::Utc;
 use futures_util::StreamExt;
 use reqwest::{
     Client,
     header::{self, HeaderMap, HeaderName, HeaderValue},
 };
-use tokio::io::AsyncWriteExt;
-use tracing::{error, info, trace};
+use tokio::{io::AsyncWriteExt, sync::Mutex};
+use tracing::{error, info};
 
 impl Download {
     pub async fn start(&self) -> Result<(), DownloadError> {
-        match &self.parts {
-            DownloadParts::NonResumable(part) => {
+        match &self.progress {
+            DownloadPartsProgress::NonResumable(part) => {
                 let me = self.clone();
-                let part = DownloadPart::NonResumable(part.clone());
+                let part = DownloadProgressPart::NonResumable(part.clone());
                 tokio::spawn(async move {
                     match me.download(part).await {
                         Ok(_) => info!("Download completed"),
@@ -23,10 +26,10 @@ impl Download {
                     }
                 });
             }
-            DownloadParts::Resumable(parts) => {
+            DownloadPartsProgress::Resumable(parts) => {
                 parts.iter().for_each(|part| {
                     let me = self.clone();
-                    let part = DownloadPart::Resumable(part.clone());
+                    let part = DownloadProgressPart::Resumable(part.clone());
                     tokio::task::spawn(async move {
                         match me.download(part).await {
                             Ok(_) => info!("Download completed"),
@@ -35,36 +38,19 @@ impl Download {
                     });
                 });
             }
-            DownloadParts::None => {}
+            DownloadPartsProgress::None => {
+                return Err(DownloadError::GeneralError(
+                    "download info not loaded".into(),
+                ));
+            }
         }
         Ok(())
     }
 
-    async fn download(self, part: DownloadPart) -> Result<(), DownloadError> {
-        trace!("Opening writer");
-        let mut writer = match open_file_writer(
-            self.file.clone(),
-            match &part {
-                DownloadPart::Resumable(part) => part.bytes_downloaded,
-                DownloadPart::NonResumable(_) => 0,
-            },
-            self.config.buffer_size,
-            Box::new(move |bytes_flushed| {
-                info!(
-                    "Downloaded {} bytes which is = {}",
-                    bytes_flushed,
-                    format_speed(bytes_flushed as u64)
-                );
-            }),
-        )
-        .await
-        {
-            Ok(writer) => writer,
-            Err(err) => return Err(DownloadError::FileSystemError(err)),
-        };
+    async fn download(self, part: DownloadProgressPart) -> Result<(), DownloadError> {
+        let last_flush_time = Arc::new(Mutex::new(Utc::now()));
 
         let client = Client::new();
-
         let mut req = client.get(&self.url);
 
         if let Some(headers) = &self.headers {
@@ -83,7 +69,8 @@ impl Download {
         }
 
         match &part {
-            DownloadPart::Resumable(part) => {
+            DownloadProgressPart::Resumable(part) => {
+                let part = part.lock().await;
                 req = req.header(
                     header::RANGE,
                     format!(
@@ -93,8 +80,58 @@ impl Download {
                     ),
                 )
             }
-            DownloadPart::NonResumable(_) => {}
+            DownloadProgressPart::NonResumable(_) => {}
         }
+
+        let mut writer = match open_file_writer(
+            self.file.clone(),
+            match &part {
+                DownloadProgressPart::Resumable(part) => part.lock().await.bytes_downloaded,
+                DownloadProgressPart::NonResumable(_) => 0,
+            },
+            self.config.buffer_size,
+            // this is gymnastics, probably just lagging 1 * buffer in progress would have been better
+            // can't make the closure async so i have to spawn a new tokio task
+            // TODO: This need to be fixed!!!!
+            // there is no way we can insert a on_flush on an existing bufwriter easily
+            // the only way is to write my own, very own simple async bufwriter
+            Box::new(move |bytes_flushed| {
+                let bytes_flushed = bytes_flushed;
+                let part = part.clone();
+                let last_flush_time = last_flush_time.clone();
+                tokio::spawn(async move {
+                    let mut last_flush_time = last_flush_time.lock().await;
+                    let current_time = Utc::now();
+                    let time_elapsed = current_time - *last_flush_time;
+                    let current_speed =
+                        ((bytes_flushed as f64) / time_elapsed.as_seconds_f64()) as usize;
+                    *last_flush_time = current_time;
+                    match part {
+                        DownloadProgressPart::Resumable(part) => {
+                            let mut part = part.lock().await;
+                            part.bytes_downloaded += bytes_flushed as u64;
+                            part.current_speed = current_speed;
+                        }
+                        DownloadProgressPart::NonResumable(part) => {
+                            let mut part = part.lock().await;
+                            part.bytes_downloaded += bytes_flushed as u64;
+                            part.current_speed = current_speed;
+                        }
+                    }
+                    // trace!(
+                    //     "Downloaded {} bytes which is = {} @ {}/s",
+                    //     bytes_flushed,
+                    //     format_bytes(bytes_flushed as u64),
+                    //     format_bytes(current_speed as u64)
+                    // );
+                });
+            }),
+        )
+        .await
+        {
+            Ok(writer) => writer,
+            Err(err) => return Err(DownloadError::FileSystemError(err)),
+        };
 
         let response = match req.send().await {
             Ok(response) => {

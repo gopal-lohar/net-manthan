@@ -3,13 +3,18 @@ use crate::errors::DownloadError;
 use crate::types::DownloadRequest;
 use crate::utils::{calculate_chunks, extract_filename};
 use crate::{NonResumableDownloadPart, ResumableDownloadPart};
-use crate::{download_part::DownloadParts, types::DownloadStatus, utils::format_speed};
+use crate::{
+    download_part::{DownloadParts, DownloadPartsProgress},
+    types::DownloadStatus,
+    utils::format_bytes,
+};
 use chrono::{DateTime, Duration, Utc};
 use reqwest::{Client, header};
 use std::{
     path::PathBuf,
     sync::{Arc, atomic::AtomicBool},
 };
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
@@ -38,6 +43,8 @@ pub struct Download {
     pub config: DownloadConfig,
     /// Parts of the download.
     pub parts: DownloadParts,
+    /// Progress of each part, shared using Arc Mutex
+    pub progress: DownloadPartsProgress,
 }
 
 impl Download {
@@ -59,6 +66,7 @@ impl Download {
             stop_token: Arc::new(AtomicBool::new(false)),
             config: config.clone(),
             parts: DownloadParts::None,
+            progress: DownloadPartsProgress::None,
         }
     }
 
@@ -128,6 +136,19 @@ impl Download {
             })
         };
 
+        self.progress = match &self.parts {
+            DownloadParts::NonResumable(part) => {
+                DownloadPartsProgress::NonResumable(Arc::new(Mutex::new(part.clone())))
+            }
+            DownloadParts::Resumable(parts) => DownloadPartsProgress::Resumable(
+                parts
+                    .iter()
+                    .map(|part| Arc::new(Mutex::new(part.clone())))
+                    .collect(),
+            ),
+            DownloadParts::None => DownloadPartsProgress::None,
+        };
+
         self.status = DownloadStatus::Queued;
 
         if total_size != self.get_total_size() {
@@ -191,12 +212,51 @@ impl Download {
 
     /// Get a formatted string representation of the average speed
     pub fn get_formatted_average_speed(&self) -> String {
-        format_speed(self.get_average_speed() as u64)
+        format!("{}/s", format_bytes(self.get_average_speed() as u64)).into()
     }
 
     /// Get a formatted string representation of the current speed
     pub fn get_formatted_current_speed(&self) -> String {
-        format_speed(self.get_current_speed() as u64)
+        format!("{}/s", format_bytes(self.get_current_speed() as u64)).into()
+    }
+
+    pub async fn update_progress(&mut self) {
+        let mut current_speed: usize = 0;
+        let mut bytes_downloaded: u64 = 0;
+        let mut status = self.status.clone();
+        match &self.progress {
+            DownloadPartsProgress::NonResumable(part) => {
+                let part = part.lock().await;
+                current_speed = part.current_speed;
+                bytes_downloaded = part.bytes_downloaded;
+                status = part.status.clone();
+            }
+            DownloadPartsProgress::Resumable(parts) => {
+                for part in parts {
+                    let part = part.lock().await;
+                    current_speed = part.current_speed;
+                    bytes_downloaded = part.bytes_downloaded;
+                    status = part.status.clone();
+                }
+            }
+            DownloadPartsProgress::None => {}
+        }
+
+        match &mut self.parts {
+            DownloadParts::NonResumable(part) => {
+                part.current_speed = current_speed;
+                part.bytes_downloaded = bytes_downloaded;
+            }
+            DownloadParts::Resumable(parts) => {
+                for part in parts {
+                    part.current_speed = current_speed;
+                    part.bytes_downloaded = bytes_downloaded;
+                }
+            }
+            DownloadParts::None => {}
+        }
+
+        _ = status;
     }
 
     pub fn get_status(&self) -> DownloadStatus {
