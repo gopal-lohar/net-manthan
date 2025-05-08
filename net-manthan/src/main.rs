@@ -1,12 +1,14 @@
-use std::{f32::consts::PI, path::PathBuf, time::Duration};
+use std::{path::PathBuf, time::Duration};
 
 use colored::Colorize;
 use download_engine::{
-    Download, DownloadParts, download_config::DownloadConfig, types::DownloadRequest,
+    Download, DownloadParts,
+    download_config::DownloadConfig,
+    types::{DownloadRequest, DownloadStatus},
     utils::format_bytes,
 };
 use tokio::{self, time::sleep};
-use tracing::{Level, debug, error, info};
+use tracing::{Level, debug, error};
 use utils::logging::{self, Component, LogConfig};
 
 use clap::{ArgAction, Parser};
@@ -23,7 +25,7 @@ pub struct Cli {
     out: Option<String>,
 
     /// Download a file using N connections
-    #[arg(short = 's', long = "split", value_name = "N", default_value = "3")]
+    #[arg(short = 's', long = "split", value_name = "N", default_value = "10")]
     split: usize,
 
     /// Enable JSON-RPC/XML-RPC server
@@ -104,9 +106,7 @@ async fn main() {
         );
 
         match download.load_download_info().await {
-            Ok(_) => {
-                info!("Download info loaded successfully");
-            }
+            Ok(_) => {}
             Err(e) => {
                 error!("Failed to load download info: {}", e);
             }
@@ -114,9 +114,7 @@ async fn main() {
 
         // TODO: handle not loaded gracefully
         match download.start().await {
-            Ok(_) => {
-                // info!("Download started successfully");
-            }
+            Ok(_) => {}
             Err(e) => {
                 error!("Failed to start download: {}", e);
             }
@@ -125,9 +123,7 @@ async fn main() {
         downloads.push(download);
     }
 
-    println!("{:?}", downloads);
-
-    println!("");
+    println!("{}", "\n".repeat(4 * downloads.len()));
 
     loop {
         sleep(Duration::from_millis(250)).await;
@@ -136,36 +132,47 @@ async fn main() {
             download.update_progress().await;
         }
 
-        let download = &downloads[0];
-        match &download.parts {
-            DownloadParts::Resumable(parts) => {
-                // for part in parts {
-                //     println!(
-                //         "{}-{} {}/{}",
-                //         part.start_byte,
-                //         part.end_byte,
-                //         part.bytes_downloaded,
-                //         part.get_total_size()
-                //     )
-                // }
-            }
-            _ => {}
-        }
+        pretty_print_progress(&mut downloads);
 
-        // pretty_print_progress(&mut downloads);
+        if downloads
+            .iter()
+            .all(|download| match download.get_status() {
+                download_engine::types::DownloadStatus::Complete => true,
+                _ => false,
+            })
+        {
+            break;
+        }
     }
 }
 
 fn pretty_print_progress(downloads: &mut Vec<Download>) {
+    println!("\x1B[{}A", (downloads.len() * 4) + 2);
     for (index, download) in &mut downloads.iter_mut().enumerate() {
+        let mut filename = download
+            .file_name
+            .clone()
+            .unwrap_or(PathBuf::from("unnamed"))
+            .to_string_lossy()
+            .into_owned();
+        filename = if filename.len() > 35 {
+            format!("{}...", &filename[..32])
+        } else {
+            filename
+        };
+        let status = match download.get_status() {
+            DownloadStatus::Downloading => "Downloading".blue(),
+            DownloadStatus::Complete => "Complete".green(),
+            DownloadStatus::Failed => "Failed".red(),
+            DownloadStatus::Cancelled => "Cancelled".red(),
+            _ => format!("{:?}", download.get_status()).red(),
+        };
         println!(
-            "\t\x1B[K {}. {:?}    {:?}",
+            "\n\t\x1B[K {}. {} {}{}",
             index + 1,
-            &download
-                .file_name
-                .clone()
-                .unwrap_or(PathBuf::from("unnamed")),
-            download.get_status()
+            filename,
+            " ".repeat(50 - (4 + filename.chars().count() + status.chars().count())),
+            status
         );
         let downloaded = format_bytes(download.get_bytes_downloaded());
         let total = format_bytes(download.get_total_size());
@@ -177,47 +184,35 @@ fn pretty_print_progress(downloads: &mut Vec<Download>) {
         }
         .to_string();
         let current_speed = format!("{}/s", format_bytes(download.get_current_speed() as u64));
-        let eta = if download.get_current_speed() == 0 {
+        let eta = if matches!(download.get_status(), DownloadStatus::Complete) {
+            "0s".to_string()
+        } else if download.get_current_speed() == 0 {
             "∞".to_string()
         } else {
             let secs = (download.get_total_size() - download.get_bytes_downloaded())
                 / (download.get_current_speed() as u64);
-            format!("{}S", secs)
+            format!("{}s", secs)
         };
         println!(
-            "\t\x1B[K [{}/{}({}) Parts:{} Speed:{} ETA:{} details: {}]\r",
+            "\t\x1B[K [{}/{}({}) Parts:{} Speed:{} ETA:{}]\r",
             downloaded,
             total,
-            percentage,
+            percentage.blue(),
             parts,
-            current_speed,
-            eta,
-            match &download.parts {
-                DownloadParts::NonResumable(part) => {
-                    format!("{}/{}", part.bytes_downloaded, part.total_size)
-                }
-                DownloadParts::Resumable(parts) => {
-                    parts
-                        .iter()
-                        .map(|part| {
-                            format!(" {}/{} ", part.bytes_downloaded, part.get_total_size())
-                        })
-                        .collect::<String>()
-                }
-                DownloadParts::None => {
-                    "".into()
-                }
-            }
+            current_speed.green(),
+            eta.yellow(),
         );
         print_progress_string(download.get_progress_percentage(), 50);
-        println!("\n\n\n");
     }
     println!("");
-    println!("\x1B[{}A", (downloads.len() * 4) + 4);
 }
 
-fn print_progress_string(mut progress: f64, width: usize) {
-    progress = progress % (100 as f64);
+fn print_progress_string(progress: f64, width: usize) {
+    let progress = if progress == 100.0 {
+        100.0
+    } else {
+        progress % (100 as f64)
+    };
     let green_bars = ((width as f64) * (progress / (100 as f64))).round() as usize;
     println!(
         "\t {}{}",

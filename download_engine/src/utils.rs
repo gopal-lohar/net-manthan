@@ -9,29 +9,30 @@ pub fn format_bytes(bytes: u64) -> String {
     const GB: u64 = MB * 1024;
 
     if bytes < KB {
-        format!("{} B", bytes)
+        format!("{}B", bytes)
     } else if bytes < MB {
-        format!("{:.2} KB", bytes as f64 / KB as f64)
+        format!("{:.2}KB", bytes as f64 / KB as f64)
     } else if bytes < GB {
-        format!("{:.2} MB", bytes as f64 / MB as f64)
+        format!("{:.2}MB", bytes as f64 / MB as f64)
     } else {
-        format!("{:.2} GB", bytes as f64 / GB as f64)
+        format!("{:.2}GB", bytes as f64 / GB as f64)
     }
 }
 
 /// split total size into chunks with ~equal size
 pub fn calculate_chunks(total_size: u64, num_chunks: u64) -> Vec<(u64, u64)> {
-    let chunk_size = total_size / num_chunks;
+    let base_chunk_size = total_size / num_chunks;
     let remainder = total_size % num_chunks;
     (0..num_chunks)
-        .filter_map(|i| {
-            let start = i * chunk_size + u64::min(i, remainder);
+        .map(|i| {
+            let start = i * base_chunk_size + u64::min(i, remainder);
             let end = if i < remainder {
-                start + chunk_size // chunk_size+1 when remainder > 0
+                start + base_chunk_size // Extra byte for first `remainder` chunks
             } else {
-                start + chunk_size - 1
+                start + base_chunk_size - 1 // No extra byte
             };
-            (end < total_size).then(|| (start, end))
+            // Cap at total_size - 1 to avoid overshooting
+            (start, end.min(total_size.saturating_sub(1)))
         })
         .collect()
 }

@@ -222,41 +222,24 @@ impl Download {
     }
 
     pub async fn update_progress(&mut self) {
-        let mut current_speed: usize = 0;
-        let mut bytes_downloaded: u64 = 0;
-        let mut status_vec: Vec<DownloadStatus> = Vec::new();
         match &self.progress {
-            DownloadPartsProgress::NonResumable(part) => {
-                let part = part.lock().await;
-                current_speed = part.current_speed;
-                bytes_downloaded = part.bytes_downloaded;
-                status_vec.push(part.status.clone());
-            }
-            DownloadPartsProgress::Resumable(parts) => {
-                for part in parts {
-                    let part = part.lock().await;
-                    current_speed = part.current_speed;
-                    bytes_downloaded = part.bytes_downloaded;
-                    status_vec.push(part.status.clone());
-                }
-            }
-            DownloadPartsProgress::None => {}
-        }
+            DownloadPartsProgress::Resumable(progress_parts) => {
+                let mut updated_parts = Vec::with_capacity(progress_parts.len());
 
-        match &mut self.parts {
-            DownloadParts::NonResumable(part) => {
-                part.current_speed = current_speed;
-                part.bytes_downloaded = bytes_downloaded;
-                part.status = (status_vec[0]).clone();
-            }
-            DownloadParts::Resumable(parts) => {
-                for (index, part) in parts.iter_mut().enumerate() {
-                    part.current_speed = current_speed;
-                    part.bytes_downloaded = bytes_downloaded;
-                    part.status = (status_vec[index]).clone();
+                for part in progress_parts {
+                    let locked_part = part.lock().await;
+                    updated_parts.push(locked_part.clone());
                 }
+
+                self.parts = DownloadParts::Resumable(updated_parts);
             }
-            DownloadParts::None => {}
+            DownloadPartsProgress::NonResumable(progress_part) => {
+                let locked_part = progress_part.lock().await;
+                self.parts = DownloadParts::NonResumable(locked_part.clone());
+            }
+            DownloadPartsProgress::None => {
+                self.parts = DownloadParts::None;
+            }
         }
     }
 
