@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use crate::{
-    Download, DownloadPartsProgress, DownloadProgressPart, errors::DownloadError,
-    open_file_writer::open_file_writer,
+    Download, DownloadParts, DownloadPartsProgress, DownloadProgressPart, errors::DownloadError,
+    open_file_writer::open_file_writer, types::DownloadStatus,
 };
 use chrono::Utc;
 use futures_util::StreamExt;
@@ -11,17 +11,28 @@ use reqwest::{
     header::{self, HeaderMap, HeaderName, HeaderValue},
 };
 use tokio::{io::AsyncWriteExt, sync::Mutex};
-use tracing::{error, info};
+use tracing::{error, info, trace};
 
 impl Download {
-    pub async fn start(&self) -> Result<(), DownloadError> {
+    pub async fn start(&mut self) -> Result<(), DownloadError> {
+        match &mut self.parts {
+            DownloadParts::NonResumable(part) => part.status = DownloadStatus::Connecting,
+            DownloadParts::Resumable(parts) => {
+                for part in parts {
+                    part.status = DownloadStatus::Connecting;
+                }
+            }
+            DownloadParts::None => {}
+        }
         match &self.progress {
             DownloadPartsProgress::NonResumable(part) => {
                 let me = self.clone();
                 let part = DownloadProgressPart::NonResumable(part.clone());
                 tokio::spawn(async move {
                     match me.download(part).await {
-                        Ok(_) => info!("Download completed"),
+                        Ok(_) => {
+                            // info!("Download completed")
+                        }
                         Err(e) => error!("Download failed: {}", e),
                     }
                 });
@@ -32,7 +43,9 @@ impl Download {
                     let part = DownloadProgressPart::Resumable(part.clone());
                     tokio::task::spawn(async move {
                         match me.download(part).await {
-                            Ok(_) => info!("Download completed"),
+                            Ok(_) => {
+                                // info!("Download completed")
+                            }
                             Err(e) => error!("Download failed: {}", e),
                         }
                     });
@@ -83,6 +96,7 @@ impl Download {
             DownloadProgressPart::NonResumable(_) => {}
         }
 
+        let part_clone = part.clone();
         let mut writer = match open_file_writer(
             self.file.clone(),
             match &part {
@@ -97,8 +111,8 @@ impl Download {
             // the only way is to write my own, very own simple async bufwriter
             Box::new(move |bytes_flushed| {
                 let bytes_flushed = bytes_flushed;
-                let part = part.clone();
                 let last_flush_time = last_flush_time.clone();
+                let part = part_clone.clone();
                 tokio::spawn(async move {
                     let mut last_flush_time = last_flush_time.lock().await;
                     let current_time = Utc::now();
@@ -111,19 +125,25 @@ impl Download {
                             let mut part = part.lock().await;
                             part.bytes_downloaded += bytes_flushed as u64;
                             part.current_speed = current_speed;
+                            if part.bytes_downloaded == (*part).get_total_size() {
+                                part.status = DownloadStatus::Complete;
+                                info!(
+                                    "Download Finished {}/{}",
+                                    part.bytes_downloaded,
+                                    part.get_total_size()
+                                );
+                                info!("bytes_flushed: {}", bytes_flushed);
+                            }
                         }
                         DownloadProgressPart::NonResumable(part) => {
                             let mut part = part.lock().await;
                             part.bytes_downloaded += bytes_flushed as u64;
                             part.current_speed = current_speed;
+                            if part.bytes_downloaded == (*part).total_size {
+                                part.status = DownloadStatus::Complete;
+                            }
                         }
                     }
-                    // trace!(
-                    //     "Downloaded {} bytes which is = {} @ {}/s",
-                    //     bytes_flushed,
-                    //     format_bytes(bytes_flushed as u64),
-                    //     format_bytes(current_speed as u64)
-                    // );
                 });
             }),
         )
@@ -148,6 +168,15 @@ impl Download {
                 return Err(DownloadError::HttpRequestError(err));
             }
         };
+
+        match &part {
+            DownloadProgressPart::NonResumable(part) => {
+                part.lock().await.status = DownloadStatus::Downloading;
+            }
+            DownloadProgressPart::Resumable(parts) => {
+                parts.lock().await.status = DownloadStatus::Downloading;
+            }
+        }
 
         let mut stream = response.bytes_stream();
 

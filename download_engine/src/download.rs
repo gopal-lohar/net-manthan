@@ -110,6 +110,7 @@ impl Download {
         };
         file.set_extension(new_extension);
 
+        self.file_name = Some(file.clone());
         self.file.push(file);
 
         self.parts = if resume {
@@ -223,20 +224,20 @@ impl Download {
     pub async fn update_progress(&mut self) {
         let mut current_speed: usize = 0;
         let mut bytes_downloaded: u64 = 0;
-        let mut status = self.status.clone();
+        let mut status_vec: Vec<DownloadStatus> = Vec::new();
         match &self.progress {
             DownloadPartsProgress::NonResumable(part) => {
                 let part = part.lock().await;
                 current_speed = part.current_speed;
                 bytes_downloaded = part.bytes_downloaded;
-                status = part.status.clone();
+                status_vec.push(part.status.clone());
             }
             DownloadPartsProgress::Resumable(parts) => {
                 for part in parts {
                     let part = part.lock().await;
                     current_speed = part.current_speed;
                     bytes_downloaded = part.bytes_downloaded;
-                    status = part.status.clone();
+                    status_vec.push(part.status.clone());
                 }
             }
             DownloadPartsProgress::None => {}
@@ -246,100 +247,103 @@ impl Download {
             DownloadParts::NonResumable(part) => {
                 part.current_speed = current_speed;
                 part.bytes_downloaded = bytes_downloaded;
+                part.status = (status_vec[0]).clone();
             }
             DownloadParts::Resumable(parts) => {
-                for part in parts {
+                for (index, part) in parts.iter_mut().enumerate() {
                     part.current_speed = current_speed;
                     part.bytes_downloaded = bytes_downloaded;
+                    part.status = (status_vec[index]).clone();
                 }
             }
             DownloadParts::None => {}
         }
-
-        _ = status;
     }
 
     pub fn get_status(&self) -> DownloadStatus {
         match &self.parts {
             DownloadParts::Resumable(parts) => {
-                // If there are no parts, return the current status
-                if parts.is_empty() {
-                    return self.status.clone();
-                }
-
-                // Check if all parts are complete
-                let all_complete = parts
-                    .iter()
-                    .all(|p| matches!(p.status, DownloadStatus::Complete));
-                if all_complete {
-                    return DownloadStatus::Complete;
-                }
-
-                // Check if all parts are Queued
-                let all_queued = parts
-                    .iter()
-                    .all(|p| matches!(p.status, DownloadStatus::Queued));
-                if all_queued {
-                    return DownloadStatus::Queued;
-                }
-
-                // Check if all parts are Cancelled
-                let all_cancelled = parts
-                    .iter()
-                    .all(|p| matches!(p.status, DownloadStatus::Cancelled));
-                if all_cancelled {
-                    return DownloadStatus::Cancelled;
-                }
-
-                // Check if any part is downloading
-                let any_downloading = parts
-                    .iter()
-                    .any(|p| matches!(p.status, DownloadStatus::Downloading));
-                if any_downloading {
-                    return DownloadStatus::Downloading;
-                }
-
-                // Check if all non-complete parts are connecting
-                let all_remaining_connecting = parts
-                    .iter()
-                    .filter(|p| !matches!(p.status, DownloadStatus::Complete))
-                    .all(|p| matches!(p.status, DownloadStatus::Connecting));
-                if all_remaining_connecting {
-                    return DownloadStatus::Connecting;
-                }
-
-                // Check if all non-complete parts are retrying
-                let all_remaining_retrying = parts
-                    .iter()
-                    .filter(|p| !matches!(p.status, DownloadStatus::Complete))
-                    .all(|p| matches!(p.status, DownloadStatus::Retrying));
-                if all_remaining_retrying {
-                    return DownloadStatus::Retrying;
-                }
-
-                // Check if all non-complete parts are failed
-                let all_remaining_failed = parts
-                    .iter()
-                    .filter(|p| !matches!(p.status, DownloadStatus::Complete))
-                    .all(|p| matches!(p.status, DownloadStatus::Failed));
-                if all_remaining_failed {
-                    return DownloadStatus::Failed;
-                }
-
-                // Check if all parts are paused
-                let all_paused = parts
-                    .iter()
-                    .all(|p| matches!(p.status, DownloadStatus::Paused));
-                if all_paused {
-                    return DownloadStatus::Paused;
-                }
-
-                // Default to current status if no specific condition is met
-                self.status.clone()
+                Download::calculate_status(parts.iter().map(|p| p.status.clone()).collect())
             }
-
             DownloadParts::NonResumable(part) => part.status.clone(),
             DownloadParts::None => DownloadStatus::Created,
         }
+    }
+
+    pub fn calculate_status(status_vec: Vec<DownloadStatus>) -> DownloadStatus {
+        // If there are no parts, return the current status
+        if status_vec.is_empty() {
+            return DownloadStatus::Created;
+        }
+
+        // Check if all parts are complete
+        let all_complete = status_vec
+            .iter()
+            .all(|p| matches!(p, DownloadStatus::Complete));
+        if all_complete {
+            return DownloadStatus::Complete;
+        }
+
+        // Check if all parts are Queued
+        let all_queued = status_vec
+            .iter()
+            .all(|p| matches!(p, DownloadStatus::Queued));
+        if all_queued {
+            return DownloadStatus::Queued;
+        }
+
+        // Check if all parts are Cancelled
+        let all_cancelled = status_vec
+            .iter()
+            .all(|p| matches!(p, DownloadStatus::Cancelled));
+        if all_cancelled {
+            return DownloadStatus::Cancelled;
+        }
+
+        // Check if any part is downloading
+        let any_downloading = status_vec
+            .iter()
+            .any(|p| matches!(p, DownloadStatus::Downloading));
+        if any_downloading {
+            return DownloadStatus::Downloading;
+        }
+
+        // Check if all non-complete parts are connecting
+        let all_remaining_connecting = status_vec
+            .iter()
+            .filter(|p| !matches!(p, DownloadStatus::Complete))
+            .all(|p| matches!(p, DownloadStatus::Connecting));
+        if all_remaining_connecting {
+            return DownloadStatus::Connecting;
+        }
+
+        // Check if all non-complete parts are retrying
+        let all_remaining_retrying = status_vec
+            .iter()
+            .filter(|p| !matches!(p, DownloadStatus::Complete))
+            .all(|p| matches!(p, DownloadStatus::Retrying));
+        if all_remaining_retrying {
+            return DownloadStatus::Retrying;
+        }
+
+        // Check if all non-complete parts are failed
+        let all_remaining_failed = status_vec
+            .iter()
+            .filter(|p| !matches!(p, DownloadStatus::Complete))
+            .all(|p| matches!(p, DownloadStatus::Failed));
+        if all_remaining_failed {
+            return DownloadStatus::Failed;
+        }
+
+        // Check if all parts are paused
+        let all_paused = status_vec
+            .iter()
+            .all(|p| matches!(p, DownloadStatus::Paused));
+        if all_paused {
+            return DownloadStatus::Paused;
+        }
+
+        // Default to Created
+        DownloadStatus::Created
     }
 }

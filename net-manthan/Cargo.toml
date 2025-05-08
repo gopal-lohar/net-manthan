@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-download_engine = {path = "../download_engine"}
+download_engine = { path = "../download_engine" }
 utils = { path = "../utils" }
 tokio.workspace = true
 tracing.workspace = true
+clap = { version = "4.5.37", features = ["derive"] }
+colored = "3.0.0"
