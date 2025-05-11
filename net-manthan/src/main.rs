@@ -5,7 +5,7 @@ use download_engine::{
     Download, DownloadParts,
     download_config::DownloadConfig,
     types::{DownloadRequest, DownloadStatus},
-    utils::format_bytes,
+    utils::{format_bytes, format_duration},
 };
 use tokio::{self, time::sleep};
 use tracing::{Level, debug, error};
@@ -146,6 +146,8 @@ async fn main() {
 }
 
 fn pretty_print_progress(downloads: &mut Vec<Download>) {
+    let progress_bar_width = 75;
+    let max_filename_len = progress_bar_width - 15;
     println!("\x1B[{}A", (downloads.len() * 4) + 2);
     for (index, download) in &mut downloads.iter_mut().enumerate() {
         let mut filename = download
@@ -154,8 +156,8 @@ fn pretty_print_progress(downloads: &mut Vec<Download>) {
             .unwrap_or(PathBuf::from("unnamed"))
             .to_string_lossy()
             .into_owned();
-        filename = if filename.len() > 35 {
-            format!("{}...", &filename[..32])
+        filename = if filename.len() > max_filename_len {
+            format!("{}...", &filename[..max_filename_len - 3])
         } else {
             filename
         };
@@ -166,17 +168,7 @@ fn pretty_print_progress(downloads: &mut Vec<Download>) {
             DownloadStatus::Cancelled => "Cancelled".red(),
             _ => format!("{:?}", download.get_status()).red(),
         };
-        println!(
-            "\n\t\x1B[K {}. {} {}{}{}",
-            index + 1,
-            filename,
-            " ".repeat(50 - (4 + filename.chars().count() + status.chars().count())),
-            status,
-            match download.last_update_time {
-                Some(_) => "".into(),
-                None => format!(" Average Speed: {}", download.get_formatted_average_speed()),
-            }
-        );
+
         let downloaded = format_bytes(download.get_bytes_downloaded());
         let total = format_bytes(download.get_total_size());
         let percentage = format!("{}%", download.get_progress_percentage() as usize,);
@@ -186,26 +178,48 @@ fn pretty_print_progress(downloads: &mut Vec<Download>) {
             DownloadParts::None => 0,
         }
         .to_string();
-        let current_speed = format!("{}/s", format_bytes(download.get_current_speed() as u64));
+        let current_speed = match download.get_status() {
+            DownloadStatus::Downloading => {
+                format!("{}", download.get_formatted_current_speed()).green()
+            }
+            _ => format!("{}", download.get_formatted_average_speed()).normal(),
+        };
         let eta = if matches!(download.get_status(), DownloadStatus::Complete) {
-            "0s".to_string()
+            format_duration(0)
         } else if download.get_current_speed() == 0 {
             "∞".to_string()
         } else {
-            let secs = (download.get_total_size() - download.get_bytes_downloaded())
-                / (download.get_current_speed() as u64);
-            format!("{}s", secs)
+            format_duration(
+                (download.get_total_size() - download.get_bytes_downloaded())
+                    / (download.get_current_speed() as u64),
+            )
         };
+        let time_elapsed = if download.active_time.as_seconds_f64() < 0. {
+            format_duration(0)
+        } else {
+            format_duration(download.active_time.as_seconds_f64() as u64)
+        };
+
         println!(
-            "\t\x1B[K [{}/{}({}) Parts:{} Speed:{} ETA:{}]\r",
+            "\n\t\x1B[K {}. {} {}{}",
+            index + 1,
+            filename,
+            " ".repeat(
+                progress_bar_width - (4 + filename.chars().count() + status.chars().count())
+            ),
+            status,
+        );
+        println!(
+            "\t\x1B[K [{}/{}({}) Parts:{} Speed:{} Time:{}/{}]\r",
             downloaded,
             total,
             percentage.blue(),
             parts,
-            current_speed.green(),
+            current_speed,
+            time_elapsed.yellow(),
             eta.yellow(),
         );
-        print_progress_string(download.get_progress_percentage(), 50);
+        print_progress_string(download.get_progress_percentage(), progress_bar_width);
     }
     println!("");
 }

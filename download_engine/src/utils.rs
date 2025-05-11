@@ -19,6 +19,38 @@ pub fn format_bytes(bytes: u64) -> String {
     }
 }
 
+pub fn format_duration(seconds: u64) -> String {
+    let days = seconds / 86400;
+    let remaining_after_days = seconds % 86400;
+
+    let hours = remaining_after_days / 3600;
+    let remaining_after_hours = remaining_after_days % 3600;
+
+    let minutes = remaining_after_hours / 60;
+    let seconds_part = remaining_after_hours % 60;
+
+    let mut parts = Vec::new();
+
+    if days > 0 {
+        parts.push(format!("{}d", days));
+    }
+    if hours > 0 {
+        parts.push(format!("{}h", hours));
+    }
+    if minutes > 0 {
+        parts.push(format!("{}m", minutes));
+    }
+    if seconds_part > 0 {
+        parts.push(format!("{}s", seconds_part));
+    }
+
+    if parts.is_empty() {
+        parts.push("0s".to_string());
+    }
+
+    parts.join("")
+}
+
 /// split total size into chunks with ~equal size
 pub fn calculate_chunks(total_size: u64, num_chunks: u64) -> Vec<(u64, u64)> {
     let base_chunk_size = total_size / num_chunks;
