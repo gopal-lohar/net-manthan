@@ -30,6 +30,15 @@ pub enum DownloadProgressPart {
     NonResumable(Arc<Mutex<NonResumableDownloadPart>>),
 }
 
+impl DownloadProgressPart {
+    pub async fn update_status(&self, status: DownloadStatus) {
+        match self {
+            DownloadProgressPart::Resumable(part) => part.lock().await.status = status,
+            DownloadProgressPart::NonResumable(part) => part.lock().await.status = status,
+        };
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ResumableDownloadPart {
     pub id: Uuid,

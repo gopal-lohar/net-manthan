@@ -35,7 +35,9 @@ pub struct Download {
     pub date_added: DateTime<Utc>,
     /// Duration of active time for the download.
     pub active_time: Duration,
-    /// Current status of the download.
+    /// last time the activetime was updated, None means download wasn't active
+    pub last_update_time: Option<DateTime<Utc>>,
+    /// Current status of the download
     status: DownloadStatus,
     /// Arc Bool token for pausing the download.
     pub stop_token: Arc<AtomicBool>,
@@ -62,6 +64,7 @@ impl Download {
             referrer: request.referrer,
             date_added: Utc::now(),
             active_time: Duration::zero(),
+            last_update_time: None,
             status: DownloadStatus::Created,
             stop_token: Arc::new(AtomicBool::new(false)),
             config: config.clone(),
@@ -159,6 +162,18 @@ impl Download {
         Ok(())
     }
 
+    pub fn set_status(&mut self, status: DownloadStatus) {
+        match &mut self.parts {
+            DownloadParts::NonResumable(part) => part.status = status,
+            DownloadParts::Resumable(parts) => {
+                for part in parts {
+                    part.status = status.clone();
+                }
+            }
+            DownloadParts::None => {}
+        }
+    }
+
     pub fn get_total_size(&self) -> u64 {
         match &self.parts {
             DownloadParts::Resumable(parts) => parts.iter().map(|part| part.get_total_size()).sum(),
@@ -194,21 +209,20 @@ impl Download {
     }
 
     pub fn get_average_speed(&self) -> usize {
+        let milli_seconds = self.active_time.num_milliseconds();
+        let milli_seconds = if milli_seconds < 0 {
+            0 as u64
+        } else {
+            milli_seconds as u64
+        };
         // If active_time is zero, return current speed instead
-        if self.active_time.num_seconds() <= 0 {
+        // also a safeguard against division by zero
+        if milli_seconds <= 0 {
             return self.get_current_speed();
         }
 
-        // Calculate bytes downloaded per second over the entire active time
         let bytes_downloaded = self.get_bytes_downloaded();
-        let seconds = self.active_time.num_seconds() as u64;
-
-        // Safeguard against division by zero
-        if seconds == 0 {
-            return 0;
-        }
-
-        ((bytes_downloaded as f64) / (seconds as f64)) as usize
+        ((bytes_downloaded * 1000) / milli_seconds) as usize
     }
 
     /// Get a formatted string representation of the average speed
@@ -240,6 +254,26 @@ impl Download {
             DownloadPartsProgress::None => {
                 self.parts = DownloadParts::None;
             }
+        }
+
+        // if we are  not actively downloading, selt last_update_time to none
+        if match self.get_status() {
+            DownloadStatus::Connecting => false,
+            DownloadStatus::Retrying => false,
+            DownloadStatus::Downloading => false,
+            _ => true,
+        } {
+            self.last_update_time = None;
+        };
+
+        match self.last_update_time {
+            Some(last_update_time) => {
+                let now = Utc::now();
+                let diff = now - last_update_time;
+                self.last_update_time = Some(now);
+                self.active_time += diff;
+            }
+            None => {}
         }
     }
 

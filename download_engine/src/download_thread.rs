@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use crate::{
-    Download, DownloadParts, DownloadPartsProgress, DownloadProgressPart, errors::DownloadError,
+    Download, DownloadPartsProgress, DownloadProgressPart, errors::DownloadError,
     open_file_writer::open_file_writer, types::DownloadStatus,
 };
 use chrono::Utc;
@@ -11,41 +11,43 @@ use reqwest::{
     header::{self, HeaderMap, HeaderName, HeaderValue},
 };
 use tokio::{io::AsyncWriteExt, sync::Mutex, time::sleep};
-use tracing::error;
+use tracing::{error, info};
 
 impl Download {
     pub async fn start(&mut self) -> Result<(), DownloadError> {
-        match &mut self.parts {
-            DownloadParts::NonResumable(part) => part.status = DownloadStatus::Connecting,
-            DownloadParts::Resumable(parts) => {
-                for part in parts {
-                    part.status = DownloadStatus::Connecting;
-                }
-            }
-            DownloadParts::None => {}
-        }
+        self.last_update_time = Some(Utc::now());
+        info!("Starting download of {:?}", self.file_name);
+        self.set_status(DownloadStatus::Connecting);
         match &self.progress {
             DownloadPartsProgress::NonResumable(part) => {
                 let me = self.clone();
                 let part = DownloadProgressPart::NonResumable(part.clone());
+                part.update_status(DownloadStatus::Downloading).await;
                 tokio::spawn(async move {
-                    match me.download(part).await {
+                    match me.download(&part).await {
                         Ok(_) => {}
-                        Err(e) => error!("Download failed: {}", e),
+                        Err(e) => {
+                            part.update_status(DownloadStatus::Failed).await;
+                            error!("Download failed: {}", e)
+                        }
                     }
                 });
             }
             DownloadPartsProgress::Resumable(parts) => {
-                parts.iter().for_each(|part| {
+                for part in parts.iter() {
                     let me = self.clone();
+                    part.lock().await.status = DownloadStatus::Downloading;
                     let part = DownloadProgressPart::Resumable(part.clone());
-                    tokio::task::spawn(async move {
-                        match me.download(part).await {
+                    tokio::spawn(async move {
+                        match me.download(&part).await {
                             Ok(_) => {}
-                            Err(e) => error!("Download failed: {}", e),
+                            Err(e) => {
+                                part.update_status(DownloadStatus::Failed).await;
+                                error!("Download failed: {}", e)
+                            }
                         }
                     });
-                });
+                }
             }
             DownloadPartsProgress::None => {
                 return Err(DownloadError::GeneralError(
@@ -56,7 +58,7 @@ impl Download {
         Ok(())
     }
 
-    async fn download(self, part: DownloadProgressPart) -> Result<(), DownloadError> {
+    async fn download(&self, part: &DownloadProgressPart) -> Result<(), DownloadError> {
         let last_flush_time = Arc::new(Mutex::new(Utc::now()));
 
         let client = Client::new();

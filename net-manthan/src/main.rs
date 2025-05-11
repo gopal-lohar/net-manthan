@@ -127,7 +127,6 @@ async fn main() {
 
     loop {
         sleep(Duration::from_millis(250)).await;
-
         for download in &mut downloads {
             download.update_progress().await;
         }
@@ -168,11 +167,15 @@ fn pretty_print_progress(downloads: &mut Vec<Download>) {
             _ => format!("{:?}", download.get_status()).red(),
         };
         println!(
-            "\n\t\x1B[K {}. {} {}{}",
+            "\n\t\x1B[K {}. {} {}{}{}",
             index + 1,
             filename,
             " ".repeat(50 - (4 + filename.chars().count() + status.chars().count())),
-            status
+            status,
+            match download.last_update_time {
+                Some(_) => "".into(),
+                None => format!(" Average Speed: {}", download.get_formatted_average_speed()),
+            }
         );
         let downloaded = format_bytes(download.get_bytes_downloaded());
         let total = format_bytes(download.get_total_size());
