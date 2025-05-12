@@ -1,17 +1,14 @@
-use std::{path::PathBuf, time::Duration};
+use std::time::Duration;
 
-use colored::Colorize;
-use download_engine::{
-    Download, DownloadParts,
-    download_config::DownloadConfig,
-    types::{DownloadRequest, DownloadStatus},
-    utils::{format_bytes, format_duration},
-};
+use crate::pretty_print_downloads::pretty_print_downloads;
+use download_engine::{Download, download_config::DownloadConfig, types::DownloadRequest};
 use tokio::{self, time::sleep};
 use tracing::{Level, debug, error};
 use utils::logging::{self, Component, LogConfig};
 
 use clap::{ArgAction, Parser};
+
+mod pretty_print_downloads;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -123,15 +120,13 @@ async fn main() {
         downloads.push(download);
     }
 
-    println!("{}", "\n".repeat(4 * downloads.len()));
-
     loop {
         sleep(Duration::from_millis(250)).await;
         for download in &mut downloads {
             download.update_progress().await;
         }
 
-        pretty_print_progress(&mut downloads);
+        pretty_print_downloads(&mut downloads, true);
 
         if downloads
             .iter()
@@ -143,97 +138,6 @@ async fn main() {
             break;
         }
     }
-}
 
-fn pretty_print_progress(downloads: &mut Vec<Download>) {
-    let progress_bar_width = 75;
-    let max_filename_len = progress_bar_width - 15;
-    println!("\x1B[{}A", (downloads.len() * 4) + 2);
-    for (index, download) in &mut downloads.iter_mut().enumerate() {
-        let mut filename = download
-            .file_name
-            .clone()
-            .unwrap_or(PathBuf::from("unnamed"))
-            .to_string_lossy()
-            .into_owned();
-        filename = if filename.len() > max_filename_len {
-            format!("{}...", &filename[..max_filename_len - 3])
-        } else {
-            filename
-        };
-        let status = match download.get_status() {
-            DownloadStatus::Downloading => "Downloading".blue(),
-            DownloadStatus::Complete => "Complete".green(),
-            DownloadStatus::Failed => "Failed".red(),
-            DownloadStatus::Cancelled => "Cancelled".red(),
-            _ => format!("{:?}", download.get_status()).red(),
-        };
-
-        let downloaded = format_bytes(download.get_bytes_downloaded());
-        let total = format_bytes(download.get_total_size());
-        let percentage = format!("{}%", download.get_progress_percentage() as usize,);
-        let parts = match &download.parts {
-            DownloadParts::NonResumable(_) => 1,
-            DownloadParts::Resumable(p) => p.len(),
-            DownloadParts::None => 0,
-        }
-        .to_string();
-        let current_speed = match download.get_status() {
-            DownloadStatus::Downloading => {
-                format!("{}", download.get_formatted_current_speed()).green()
-            }
-            _ => format!("{}", download.get_formatted_average_speed()).normal(),
-        };
-        let eta = if matches!(download.get_status(), DownloadStatus::Complete) {
-            format_duration(0)
-        } else if download.get_current_speed() == 0 {
-            "∞".to_string()
-        } else {
-            format_duration(
-                (download.get_total_size() - download.get_bytes_downloaded())
-                    / (download.get_current_speed() as u64),
-            )
-        };
-        let time_elapsed = if download.active_time.as_seconds_f64() < 0. {
-            format_duration(0)
-        } else {
-            format_duration(download.active_time.as_seconds_f64() as u64)
-        };
-
-        println!(
-            "\n\t\x1B[K {}. {} {}{}",
-            index + 1,
-            filename,
-            " ".repeat(
-                progress_bar_width - (4 + filename.chars().count() + status.chars().count())
-            ),
-            status,
-        );
-        println!(
-            "\t\x1B[K [{}/{}({}) Parts:{} Speed:{} Time:{}/{}]\r",
-            downloaded,
-            total,
-            percentage.blue(),
-            parts,
-            current_speed,
-            time_elapsed.yellow(),
-            eta.yellow(),
-        );
-        print_progress_string(download.get_progress_percentage(), progress_bar_width);
-    }
-    println!("");
-}
-
-fn print_progress_string(progress: f64, width: usize) {
-    let progress = if progress == 100.0 {
-        100.0
-    } else {
-        progress % (100 as f64)
-    };
-    let green_bars = ((width as f64) * (progress / (100 as f64))).round() as usize;
-    println!(
-        "\t {}{}",
-        "━".repeat(green_bars).green(),
-        "━".repeat(width - green_bars).bright_black()
-    )
+    pretty_print_downloads(&mut downloads, false);
 }
