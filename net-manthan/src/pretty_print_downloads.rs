@@ -7,6 +7,9 @@ use download_engine::{
     utils::{format_bytes, format_duration},
 };
 
+const TAB_SPACE: &str = "  ";
+const CLEAR_LINE: &str = "\x1B[K";
+
 /// Prints the progress of a vector of downloads in pretty format in terminal
 pub fn pretty_print_downloads(downloads: &mut Vec<Download>, clear_after_print: bool) {
     // there are 4 goals here
@@ -27,8 +30,6 @@ pub fn pretty_print_downloads(downloads: &mut Vec<Download>, clear_after_print: 
 
     let progress_bar_width = 75;
     let max_filename_len = progress_bar_width - 15;
-
-    println!("\x1B[K");
 
     for (index, download) in &mut downloads.iter_mut().enumerate() {
         let mut filename = download
@@ -66,7 +67,7 @@ pub fn pretty_print_downloads(downloads: &mut Vec<Download>, clear_after_print: 
             _ => format!("{}", download.get_formatted_average_speed()).normal(),
         };
         let eta = if matches!(download.get_status(), DownloadStatus::Complete) {
-            format_duration(0)
+            "".into()
         } else if download.get_current_speed() == 0 {
             "∞".to_string()
         } else {
@@ -81,8 +82,15 @@ pub fn pretty_print_downloads(downloads: &mut Vec<Download>, clear_after_print: 
             format_duration(download.active_time.as_seconds_f64() as u64)
         };
 
+        let time = if matches!(download.get_status(), DownloadStatus::Complete) {
+            time_elapsed.yellow()
+        } else {
+            format!("{}/{}", time_elapsed.yellow(), eta.yellow()).normal()
+        };
+
+        // clear the line, go to next line, clear the line, add a tab then do the business
         println!(
-            "\n\t\x1B[K {}. {} {}{}",
+            "{CLEAR_LINE}\n{CLEAR_LINE}{TAB_SPACE}{}. {} {}{}",
             index + 1,
             filename,
             " ".repeat(
@@ -91,21 +99,20 @@ pub fn pretty_print_downloads(downloads: &mut Vec<Download>, clear_after_print: 
             status,
         );
         println!(
-            "\t\x1B[K [{}/{}({}) Parts:{} Speed:{} Time:{}/{}]\r",
+            "{CLEAR_LINE}{TAB_SPACE}[{}/{}({}) Parts:{} Speed:{} Time:{}]",
             downloaded,
             total,
             percentage.blue(),
             parts,
             current_speed,
-            time_elapsed.yellow(),
-            eta.yellow(),
+            time
         );
         print_progress_string(download.get_progress_percentage(), progress_bar_width);
     }
 
-    println!("\x1B[K");
+    println!("{CLEAR_LINE}");
     if clear_after_print {
-        print!("\x1B[{}A", (downloads.len() * 4) + 2);
+        print!("\x1B[{}A", (downloads.len() * 4) + 1);
     }
 }
 
@@ -117,7 +124,7 @@ fn print_progress_string(progress: f64, width: usize) {
     };
     let green_bars = ((width as f64) * (progress / (100 as f64))).round() as usize;
     println!(
-        "\t {}{}",
+        "{TAB_SPACE}{}{}",
         "━".repeat(green_bars).green(),
         "━".repeat(width - green_bars).bright_black()
     )
