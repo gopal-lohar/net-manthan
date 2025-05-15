@@ -102,14 +102,6 @@ async fn main() {
             },
         );
 
-        match download.load_download_info().await {
-            Ok(_) => {}
-            Err(e) => {
-                error!("Failed to load download info: {}", e);
-            }
-        }
-
-        // TODO: handle not loaded gracefully
         match download.start().await {
             Ok(_) => {}
             Err(e) => {

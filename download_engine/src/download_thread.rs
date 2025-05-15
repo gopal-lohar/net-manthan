@@ -15,8 +15,23 @@ use tracing::{error, info};
 
 impl Download {
     pub async fn start(&mut self) -> Result<(), DownloadError> {
+        // handle if download info not already loaded
+        if matches!(&self.progress, DownloadPartsProgress::None) {
+            match self.load_download_info().await {
+                Ok(_) => {
+                    if matches!(&self.progress, DownloadPartsProgress::None) {
+                        return Err(DownloadError::GeneralError(
+                            "failed to load download info".into(),
+                        ));
+                    }
+                }
+                Err(err) => return Err(err),
+            }
+        }
+
+        info!("Starting download, id {:?} {:?}", self.id, self.file_name);
+
         self.last_update_time = Some(Utc::now());
-        info!("Starting download of {:?}", self.file_name);
         self.set_status(DownloadStatus::Connecting);
         match &self.progress {
             DownloadPartsProgress::NonResumable(part) => {
@@ -50,9 +65,7 @@ impl Download {
                 }
             }
             DownloadPartsProgress::None => {
-                return Err(DownloadError::GeneralError(
-                    "download info not loaded".into(),
-                ));
+                unreachable!("Download Information should already be loaded.");
             }
         }
         Ok(())

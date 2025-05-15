@@ -15,6 +15,7 @@ use std::{
     sync::{Arc, atomic::AtomicBool},
 };
 use tokio::sync::Mutex;
+use tracing::info;
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
@@ -74,11 +75,13 @@ impl Download {
     }
 
     pub async fn load_download_info(&mut self) -> Result<(), DownloadError> {
+        info!("Loading download_info for {:?}", self.id);
         self.status = DownloadStatus::Connecting;
         let client = Client::new();
         let response = match client.get(&self.url).send().await {
             Ok(response) => response,
             Err(err) => {
+                self.status = DownloadStatus::Failed;
                 return Err(DownloadError::HttpRequestError(err));
             }
         };
@@ -156,6 +159,9 @@ impl Download {
         self.status = DownloadStatus::Queued;
 
         if total_size != self.get_total_size() {
+            self.status = DownloadStatus::Failed;
+            self.parts = DownloadParts::None;
+            self.progress = DownloadPartsProgress::None;
             return Err(DownloadError::GeneralError("Mismatch in total size".into()));
         }
 
