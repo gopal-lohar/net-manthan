@@ -9,6 +9,7 @@ use download_engine::{
 
 const TAB_SPACE: &str = "  ";
 const CLEAR_LINE: &str = "\x1B[K";
+const MOVE_UP: &str = "\x1B[1A";
 
 /// Prints the progress of a vector of downloads in pretty format in terminal
 pub fn pretty_print_downloads(downloads: &mut Vec<Download>, clear_after_print: bool) {
@@ -31,6 +32,7 @@ pub fn pretty_print_downloads(downloads: &mut Vec<Download>, clear_after_print: 
     let progress_bar_width = 75;
     let max_filename_len = progress_bar_width - 15;
 
+    println!("{CLEAR_LINE}");
     for (index, download) in &mut downloads.iter_mut().enumerate() {
         let mut filename = download
             .file_name
@@ -112,7 +114,7 @@ pub fn pretty_print_downloads(downloads: &mut Vec<Download>, clear_after_print: 
 
     println!("{CLEAR_LINE}");
     if clear_after_print {
-        print!("\x1B[{}A", (downloads.len() * 4) + 1);
+        print!("{}", format!("{MOVE_UP}").repeat((downloads.len() * 4) + 2));
     }
 }
 

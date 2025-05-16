@@ -1,13 +1,15 @@
 use std::time::Duration;
 
 use crate::pretty_print_downloads::pretty_print_downloads;
-use download_engine::{Download, download_config::DownloadConfig, types::DownloadRequest};
+use download_engine::types::DownloadRequest;
+use download_manager::DownloadManager;
 use tokio::{self, time::sleep};
-use tracing::{Level, debug, error};
+use tracing::{Level, debug, error, info};
 use utils::logging::{self, Component, LogConfig};
 
 use clap::{ArgAction, Parser};
 
+mod download_manager;
 mod pretty_print_downloads;
 
 #[derive(Parser)]
@@ -83,10 +85,11 @@ async fn main() {
         }
     }
 
-    let mut downloads: Vec<Download> = Vec::new();
+    let manager_handle = DownloadManager::new();
+
     for url in cli.urls {
-        let mut download = Download::new(
-            DownloadRequest {
+        match manager_handle
+            .add_download(DownloadRequest {
                 url,
                 file_dir: (&cli.dir).clone().unwrap_or("/tmp/".into()).into(),
                 file_name: match &cli.out {
@@ -95,28 +98,29 @@ async fn main() {
                 },
                 referrer: None,
                 headers: None,
-            },
-            &DownloadConfig {
-                connections_per_server: cli.split,
-                ..Default::default()
-            },
-        );
-
-        match download.start().await {
-            Ok(_) => {}
-            Err(e) => {
-                error!("Failed to start download: {}", e);
+            })
+            .await
+        {
+            Ok(id) => {
+                info!("Downlaod started for {}", id.unwrap_or("default".into()));
+            }
+            Err(err) => {
+                error!("Something went wrong when adding download: {}", err);
             }
         }
-
-        downloads.push(download);
     }
 
+    let mut downloads;
+
     loop {
-        sleep(Duration::from_millis(250)).await;
-        for download in &mut downloads {
-            download.update_progress().await;
-        }
+        sleep(Duration::from_millis(500)).await;
+        downloads = match manager_handle.get_downloads().await {
+            Ok(downloads) => downloads,
+            Err(e) => {
+                error!("Failed to get downloads: {}", e);
+                continue;
+            }
+        };
 
         pretty_print_downloads(&mut downloads, true);
 

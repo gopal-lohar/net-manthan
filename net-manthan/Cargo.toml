@@ -8,5 +8,6 @@ download_engine = { path = "../download_engine" }
 utils = { path = "../utils" }
 tokio.workspace = true
 tracing.workspace = true
+anyhow.workspace = true
 clap = { version = "4.5.37", features = ["derive"] }
 colored = "3.0.0"
