@@ -10,6 +10,7 @@ use utils::logging::{self, Component, LogConfig};
 use clap::{ArgAction, Parser};
 
 mod download_manager;
+mod net_manthan_config;
 mod pretty_print_downloads;
 
 #[derive(Parser)]
