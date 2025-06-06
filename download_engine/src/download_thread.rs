@@ -111,7 +111,10 @@ impl Download {
         let mut writer = match open_file_writer(
             self.file.clone(),
             match &part {
-                DownloadProgressPart::Resumable(part) => part.lock().await.bytes_downloaded,
+                DownloadProgressPart::Resumable(part) => {
+                    let part = part.lock().await;
+                    part.start_byte + part.bytes_downloaded
+                }
                 DownloadProgressPart::NonResumable(_) => 0,
             },
             self.config.buffer_size,
