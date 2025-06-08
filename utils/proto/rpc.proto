@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package rpc;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+// RPC Request
+message RpcRequest {
+    uint64 request_id = 1;
+    oneof request {
+        DownloadRequest download_request = 2;
+        GetDownload get_download = 3;
+        GetDownloads get_dowloads = 4;
+        HeartBeat heart_beat = 5;
+    }
+}
+
+
+message DownloadRequest {
+    string url = 1;
+    string file_dir = 2;
+    optional string filename = 3;
+    optional string referrer = 4;
+    repeated string headers = 5;
+}
+
+message GetDownload {
+    string id = 1;
+}
+
+// TODO: add filters in here
+message GetDownloads {
+}
+
+message HeartBeat {
+    google.protobuf.Timestamp request_timestamp = 1;
+}
+
+// RPC Response
+message RpcResponse {
+    uint64 request_id = 1;
+    oneof response {
+        GetDownload download_created = 2;
+        Download download = 3;
+        Download downloads = 4;
+        HeartBeat hear_beat = 5;
+    }
+}
+
+message Download{
+    string id = 1;
+    string url = 2;
+    string file = 3;
+    string file_name = 4;
+    repeated string headers = 5;
+    optional string referrer = 6;
+    google.protobuf.Timestamp date_added = 7;
+    google.protobuf.Duration active_time = 8;
+    DownloadStatus status = 9;
+    oneof parts {
+        ResumableParts resumable = 10;
+        NonResumablePart non_resumable = 11;
+        None none = 12;
+    }
+}
+
+enum DownloadStatus {
+    STATUS_UNSPECIFIED = 0;
+    CREATED = 1;
+    QUEUED = 2;
+    CONNECTING = 3;
+    RETRYING = 4;
+    DOWNLOADING = 5;
+    PAUSED = 6;
+    COMPLETE = 7;
+    FAILED = 8;
+    CANCELLED = 9;
+}
+
+message ResumableParts {
+    repeated ResumablePart parts = 1;
+}
+
+message ResumablePart {
+    string id = 1;
+    DownloadStatus status = 2;
+    uint64 start_byte = 3;
+    uint64 end_byte = 4;
+    uint64 bytes_downloaded = 5;
+    uint64 current_speed = 6;
+}
+
+message NonResumablePart {
+    string id = 1;
+    DownloadStatus status = 2;
+    uint64 total_bytes = 3;
+    uint64 bytes_downloaded = 4;
+    uint64 current_speed = 5;
+}
+
+message None {}
