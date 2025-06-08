@@ -45,6 +45,7 @@ message RpcResponse {
         Download download = 3;
         Download downloads = 4;
         HeartBeat hear_beat = 5;
+        Error error = 6;
     }
 }
 
@@ -100,3 +101,8 @@ message NonResumablePart {
 }
 
 message None {}
+
+message Error {
+    // TODO: convert kind to enum for better error handling
+    string kind = 1;
+}

@@ -7,9 +7,13 @@ edition = "2024"
 tracing.workspace = true
 tracing-appender.workspace = true
 tracing-subscriber.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
 prost = "0.13.5"
 tonic = "0.13.1"
 prost-types = "0.13.5"
+bytes = "1.10.1"
+tokio-util = "0.7.15"
 
 [build-dependencies]
 tonic-build = "0.13.1"

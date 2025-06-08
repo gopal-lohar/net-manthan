@@ -1,3 +1,5 @@
+pub mod ipc_server;
+
 use std::fmt;
 
 #[derive(Debug, Clone)]
