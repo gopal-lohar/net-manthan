@@ -1,15 +1,19 @@
 use crate::{
     rpc::{RpcConfig, ipc_server::native::start_native_server},
-    rpc_types::{Error, RpcRequest, RpcResponse, rpc_response::Response},
+    rpc_types::{
+        Download, DownloadRequest, Error, GetDownload, GetDownloads, RpcRequest, RpcResponse,
+        rpc_request::Request, rpc_response::Response,
+    },
 };
+use rand::Rng;
 use tokio::sync::{mpsc, oneshot};
 use tracing::info;
 
 mod native;
 
 pub struct ManagerCommand {
-    request: RpcRequest,
-    respond_to: oneshot::Sender<RpcResponse>,
+    pub request: RpcRequest,
+    pub respond_to: oneshot::Sender<RpcResponse>,
 }
 
 pub struct RpcServer {
@@ -18,8 +22,7 @@ pub struct RpcServer {
 }
 
 impl RpcServer {
-    pub fn new(config: &RpcConfig, command_sender: mpsc::Sender<ManagerCommand>) -> Self {
-        let handle = RpcServerHandle { command_sender };
+    pub fn new(config: &RpcConfig, handle: RpcServerHandle) -> Self {
         Self {
             config: config.clone(),
             handle,
@@ -46,7 +49,7 @@ impl RpcServer {
 
 #[derive(Debug, Clone)]
 pub struct RpcServerHandle {
-    command_sender: mpsc::Sender<ManagerCommand>,
+    pub command_sender: mpsc::Sender<ManagerCommand>,
 }
 
 impl RpcServerHandle {
@@ -80,6 +83,46 @@ impl RpcServerHandle {
                     ),
                 })),
             },
+        }
+    }
+
+    pub async fn add_download(&mut self, request: DownloadRequest) -> Result<GetDownload, String> {
+        let mut rng = rand::rngs::ThreadRng::default();
+        let request_id: u64 = rng.random();
+
+        let response = self
+            .handle_call(RpcRequest {
+                request_id,
+                request: Some(Request::AddDownload(request)),
+            })
+            .await;
+
+        match response.response {
+            Some(res) => match res {
+                Response::DownloadCreated(download) => Ok(download),
+                _ => Err("Something went wrong".to_string()),
+            },
+            None => Err("Something went wrong".to_string()),
+        }
+    }
+
+    pub async fn get_downloads(&mut self) -> Result<Vec<Download>, String> {
+        let mut rng = rand::rngs::ThreadRng::default();
+        let request_id: u64 = rng.random();
+
+        let response = self
+            .handle_call(RpcRequest {
+                request_id,
+                request: Some(Request::GetDownloads(GetDownloads {})),
+            })
+            .await;
+
+        match response.response {
+            Some(res) => match res {
+                Response::Downloads(d) => Ok(d.list),
+                _ => Err("Something went wrong".to_string()),
+            },
+            None => Err("Something went wrong".to_string()),
         }
     }
 }

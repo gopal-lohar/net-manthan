@@ -4,16 +4,20 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+download_engine = { path = "../download_engine" }
 tracing.workspace = true
 tracing-appender.workspace = true
 tracing-subscriber.workspace = true
 tokio.workspace = true
 anyhow.workspace = true
+chrono.workspace = true
+uuid.workspace = true
 prost = "0.13.5"
 tonic = "0.13.1"
 prost-types = "0.13.5"
 bytes = "1.10.1"
 tokio-util = "0.7.15"
+rand = "0.9.1"
 
 [build-dependencies]
 tonic-build = "0.13.1"

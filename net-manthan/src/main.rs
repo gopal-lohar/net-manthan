@@ -1,15 +1,20 @@
-use std::time::Duration;
+use std::{path::PathBuf, time::Duration};
 
 use crate::pretty_print_downloads::pretty_print_downloads;
-use download_engine::types::DownloadRequest;
+use clap::{ArgAction, Parser};
+use download_engine::{download_config::DownloadConfig, types::DownloadRequest};
 use download_manager::DownloadManager;
+use net_manthan_config::NetManthanConfig;
 use tokio::{self, time::sleep};
 use tracing::{Level, debug, error, info};
-use utils::logging::{self, Component, LogConfig};
-
-use clap::{ArgAction, Parser};
+use utils::{
+    conversion::{convert_from_download_proto, convert_to_download_req_proto},
+    logging::{self, Component, LogConfig},
+    rpc::ipc_server::RpcServer,
+};
 
 mod download_manager;
+mod net_manthan_config;
 mod pretty_print_downloads;
 
 #[derive(Parser)]
@@ -57,12 +62,24 @@ pub struct Cli {
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
+    let net_manthan_config = NetManthanConfig {
+        download_dir: cli.dir,
+        log_file: cli.log,
+        log_level: cli.log_level,
+        download_config: DownloadConfig::default(),
+        max_concurrent_downloads: 10,
+        ..Default::default()
+    };
+
     // Initialize logging
     match logging::init_logging(LogConfig {
         component: Component::NetManthan,
-        log_dir: ".dev/logs".into(),
+        log_dir: net_manthan_config
+            .log_file
+            .map(PathBuf::from)
+            .unwrap_or(".dev/logs".into()),
         silent_deps: vec!["hyper_util".into(), "mio".into()],
-        max_level: match cli.log_level.as_str() {
+        max_level: match &net_manthan_config.log_level[..] {
             "trace" => Level::TRACE,
             "debug" => Level::DEBUG,
             "info" => Level::INFO,
@@ -85,24 +102,31 @@ async fn main() {
         }
     }
 
-    let manager_handle = DownloadManager::new();
+    let mut manager_handle = DownloadManager::new();
+
+    // if ipc is Disable it will be handled in the server only
+    let ipc_server = RpcServer::new(&net_manthan_config.rpc_config, manager_handle.clone());
+    ipc_server.start().await;
 
     for url in cli.urls {
         match manager_handle
-            .add_download(DownloadRequest {
+            .add_download(convert_to_download_req_proto(DownloadRequest {
                 url,
-                file_dir: (&cli.dir).clone().unwrap_or("/tmp/".into()).into(),
+                file_dir: (&net_manthan_config.download_dir)
+                    .clone()
+                    .unwrap_or("/tmp/".into())
+                    .into(),
                 file_name: match &cli.out {
                     Some(out) => Some(out.into()),
                     None => None,
                 },
                 referrer: None,
                 headers: None,
-            })
+            }))
             .await
         {
-            Ok(id) => {
-                info!("Downlaod started for {}", id.unwrap_or("default".into()));
+            Ok(res) => {
+                info!("Downlaod started for {}", res.id);
             }
             Err(err) => {
                 error!("Something went wrong when adding download: {}", err);
@@ -110,12 +134,15 @@ async fn main() {
         }
     }
 
-    let mut downloads;
+    let mut downloads: Vec<download_engine::Download>;
 
     loop {
         sleep(Duration::from_millis(500)).await;
         downloads = match manager_handle.get_downloads().await {
-            Ok(downloads) => downloads,
+            Ok(downloads) => downloads
+                .iter()
+                .map(|d| convert_from_download_proto(d))
+                .collect(),
             Err(e) => {
                 error!("Failed to get downloads: {}", e);
                 continue;
@@ -130,6 +157,7 @@ async fn main() {
                 download_engine::types::DownloadStatus::Complete => true,
                 _ => false,
             })
+            && net_manthan_config.daemon
         {
             break;
         }

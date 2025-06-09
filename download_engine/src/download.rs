@@ -38,8 +38,8 @@ pub struct Download {
     pub active_time: Duration,
     /// last time the activetime was updated, None means download wasn't active
     pub last_update_time: Option<DateTime<Utc>>,
-    /// Current status of the download
-    status: DownloadStatus,
+    /// Current status of the download (Remove it asap and account for it everywhere)
+    pub status: DownloadStatus,
     /// Arc Bool token for pausing the download.
     pub stop_token: Arc<AtomicBool>,
     /// configuration options for the download.

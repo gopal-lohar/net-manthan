@@ -1,72 +1,16 @@
-use anyhow::{Context, Result};
-use download_engine::{Download, download_config::DownloadConfig, types::DownloadRequest};
+use download_engine::{Download, download_config::DownloadConfig};
 use tokio::{
-    sync::{mpsc, oneshot},
+    sync::mpsc,
     time::{Duration, interval},
 };
-
-pub enum ManagerCommand {
-    AddDownload {
-        request: DownloadRequest,
-        respond_to: oneshot::Sender<Option<String>>,
+use utils::{
+    conversion::{convert_to_download_proto, convert_to_download_req},
+    rpc::ipc_server::{ManagerCommand, RpcServerHandle as DownloadManagerHandle},
+    rpc_types::{
+        DownloadList, Error as ErrorProto, GetDownload, RpcResponse, rpc_request::Request,
+        rpc_response::Response,
     },
-    #[allow(unused)]
-    GetDownload {
-        id: String,
-        respond_to: oneshot::Sender<Option<Download>>,
-    },
-    GetDownloads {
-        respond_to: oneshot::Sender<Vec<Download>>,
-    },
-}
-
-/// Sender handle that can be cloned and shared with API servers
-#[derive(Clone)]
-pub struct DownloadManagerHandle {
-    command_sender: mpsc::Sender<ManagerCommand>,
-}
-
-impl DownloadManagerHandle {
-    pub async fn add_download(&self, request: DownloadRequest) -> Result<Option<String>> {
-        let (send, recv) = oneshot::channel();
-        self.command_sender
-            .send(ManagerCommand::AddDownload {
-                request,
-                respond_to: send,
-            })
-            .await
-            .context("Download manager thread has terminated")?;
-
-        recv.await
-            .context("Download manager dropped the response channel")
-    }
-
-    #[allow(unused)]
-    pub async fn get_download(&self, id: String) -> Result<Option<Download>> {
-        let (send, recv) = oneshot::channel();
-        self.command_sender
-            .send(ManagerCommand::GetDownload {
-                id,
-                respond_to: send,
-            })
-            .await
-            .context("Download manager thread has terminated")?;
-
-        recv.await
-            .context("Download manager dropped the response channel")
-    }
-
-    pub async fn get_downloads(&self) -> Result<Vec<Download>> {
-        let (send, recv) = oneshot::channel();
-        self.command_sender
-            .send(ManagerCommand::GetDownloads { respond_to: send })
-            .await
-            .context("Download manager thread has terminated")?;
-
-        recv.await
-            .context("Download manager dropped the response channel")
-    }
-}
+};
 
 pub struct DownloadManager {
     all_downloads: Vec<Download>,
@@ -115,40 +59,69 @@ impl DownloadManager {
         }
     }
 
-    async fn handle_command(&mut self, cmd: ManagerCommand) {
-        match cmd {
-            ManagerCommand::AddDownload {
-                request,
-                respond_to,
-            } => {
-                let mut download = Download::new(request, &DownloadConfig::default());
-                match respond_to.send(Some(download.id.to_string())) {
-                    Ok(_) => {}
-                    Err(_) => {}
-                }
-                match download.start().await {
-                    Ok(_) => {}
-                    Err(_) => {}
-                }
-                self.all_downloads.push(download);
-            }
+    async fn handle_command(&mut self, command: ManagerCommand) {
+        let respond_to = command.respond_to;
+        let request_id = command.request.request_id;
+        if let Some(req) = command.request.request {
+            match req {
+                Request::AddDownload(download_request) => {
+                    let mut download = Download::new(
+                        convert_to_download_req(download_request),
+                        &DownloadConfig::default(),
+                    );
 
-            ManagerCommand::GetDownload { id, respond_to } => {
-                let download = self
-                    .all_downloads
-                    .iter()
-                    .find(|s| s.id.to_string() == id)
-                    .cloned();
-                match respond_to.send(download) {
-                    Ok(_) => {}
-                    Err(_) => {}
+                    let _ = respond_to.send(RpcResponse {
+                        request_id,
+                        response: Some(Response::DownloadCreated(GetDownload {
+                            id: download.id.to_string(),
+                        })),
+                    });
+                    let _ = download.start().await;
+                    self.all_downloads.push(download);
                 }
-            }
-
-            ManagerCommand::GetDownloads { respond_to } => {
-                match respond_to.send(self.all_downloads.clone()) {
-                    Ok(_) => {}
-                    Err(_) => {}
+                Request::HeartBeat(heartbeat) => {
+                    let _ = respond_to.send(RpcResponse {
+                        request_id,
+                        response: Some(Response::HearBeat(heartbeat)),
+                    });
+                }
+                Request::GetDownload(request) => {
+                    let id = request.id;
+                    let download = self
+                        .all_downloads
+                        .iter()
+                        .find(|s| s.id.to_string() == id)
+                        .cloned();
+                    match download {
+                        Some(download) => {
+                            let _ = respond_to.send(RpcResponse {
+                                request_id,
+                                response: Some(Response::Download(convert_to_download_proto(
+                                    &download,
+                                ))),
+                            });
+                        }
+                        None => {
+                            let _ = respond_to.send(RpcResponse {
+                                request_id,
+                                response: Some(Response::Error(ErrorProto {
+                                    kind: "NOT FOUND".to_string(),
+                                })),
+                            });
+                        }
+                    }
+                }
+                Request::GetDownloads(_) => {
+                    let downloads: Vec<utils::rpc_types::Download> = self
+                        .all_downloads
+                        .clone()
+                        .iter()
+                        .map(|d| convert_to_download_proto(d))
+                        .collect();
+                    let _ = respond_to.send(RpcResponse {
+                        request_id,
+                        response: Some(Response::Downloads(DownloadList { list: downloads })),
+                    });
                 }
             }
         }

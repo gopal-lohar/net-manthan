@@ -1,8 +1,7 @@
 use crate::rpc_types::RpcRequest;
 use anyhow::{Context, Result};
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use bytes::{Buf, BufMut, BytesMut};
 use prost::Message;
-use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::oneshot;
@@ -62,10 +61,12 @@ impl Encoder<Vec<u8>> for MessageCodec {
 
 #[derive(Debug)]
 pub struct NativeServerHandle {
+    #[allow(unused)]
     shutdown_tx: oneshot::Sender<()>,
 }
 
 impl NativeServerHandle {
+    #[allow(unused)]
     pub async fn shutdown(self) -> Result<()> {
         let _ = self.shutdown_tx.send(());
         Ok(())

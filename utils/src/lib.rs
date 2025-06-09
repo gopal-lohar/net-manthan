@@ -1,3 +1,4 @@
+pub mod conversion;
 pub mod logging;
 pub mod rpc;
 pub mod rpc_types {

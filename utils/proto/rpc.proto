@@ -9,9 +9,9 @@ import "google/protobuf/duration.proto";
 message RpcRequest {
     uint64 request_id = 1;
     oneof request {
-        DownloadRequest download_request = 2;
+        DownloadRequest add_download= 2;
         GetDownload get_download = 3;
-        GetDownloads get_dowloads = 4;
+        GetDownloads get_downloads = 4;
         HeartBeat heart_beat = 5;
     }
 }
@@ -43,10 +43,14 @@ message RpcResponse {
     oneof response {
         GetDownload download_created = 2;
         Download download = 3;
-        Download downloads = 4;
+        DownloadList downloads = 4;
         HeartBeat hear_beat = 5;
         Error error = 6;
     }
+}
+
+message DownloadList{
+    repeated Download list = 1;
 }
 
 message Download{

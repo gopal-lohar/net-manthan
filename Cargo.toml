@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = [ "download_engine","net-manthan", "ui", "utils"]
+members = ["download_engine", "net-manthan", "ui", "utils"]
 exclude = ["extensions", "net-manthan-app"]
 
 [workspace.dependencies]
@@ -9,3 +9,5 @@ tracing = "0.1.41"
 tracing-appender = "0.2.3"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 tokio = { version = "1.44.2", features = ["full"] }
+chrono = { version = "0.4.41", features = ["serde"] }
+uuid = { version = "1.16.0", features = ["v4"] }
