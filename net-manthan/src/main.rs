@@ -10,7 +10,8 @@ use tracing::{Level, debug, error, info};
 use utils::{
     conversion::{convert_from_download_proto, convert_to_download_req_proto},
     logging::{self, Component, LogConfig},
-    rpc::ipc_server::RpcServer,
+    rpc::{NativeRpcSettings, RpcConfig, client::send_rpc_request, server::RpcServer},
+    rpc_types::rpc_request::Request,
 };
 
 mod download_manager;
@@ -68,6 +69,11 @@ async fn main() {
         log_level: cli.log_level,
         download_config: DownloadConfig::default(),
         max_concurrent_downloads: 10,
+        rpc_config: RpcConfig::Native(NativeRpcSettings {
+            address: "hellyeah".into(),
+            allow_all_users: true,
+            secret: "".into(),
+        }),
         ..Default::default()
     };
 
@@ -109,24 +115,42 @@ async fn main() {
     ipc_server.start().await;
 
     for url in cli.urls {
-        match manager_handle
-            .add_download(convert_to_download_req_proto(DownloadRequest {
-                url,
-                file_dir: (&net_manthan_config.download_dir)
-                    .clone()
-                    .unwrap_or("/tmp/".into())
-                    .into(),
-                file_name: match &cli.out {
-                    Some(out) => Some(out.into()),
-                    None => None,
-                },
-                referrer: None,
-                headers: None,
-            }))
-            .await
+        match
+        // manager_handle
+        //     .add_download(convert_to_download_req_proto(DownloadRequest {
+        //         url,
+        //         file_dir: (&net_manthan_config.download_dir)
+        //             .clone()
+        //             .unwrap_or("/tmp/".into())
+        //             .into(),
+        //         file_name: match &cli.out {
+        //             Some(out) => Some(out.into()),
+        //             None => None,
+        //         },
+        //         referrer: None,
+        //         headers: None,
+        //     }))
+        //     .await
+        send_rpc_request(&NativeRpcSettings {
+            address: "hellyeah".into(),
+            allow_all_users: true,
+            secret: "".into(),
+        }, Request::AddDownload(convert_to_download_req_proto(DownloadRequest {
+            url,
+            file_dir: (&net_manthan_config.download_dir)
+                .clone()
+                .unwrap_or("/tmp/".into())
+                .into(),
+            file_name: match &cli.out {
+                Some(out) => Some(out.into()),
+                None => None,
+            },
+            referrer: None,
+            headers: None,
+        }))).await
         {
             Ok(res) => {
-                info!("Downlaod started for {}", res.id);
+                info!("Downlaod started for {:?}", res);
             }
             Err(err) => {
                 error!("Something went wrong when adding download: {}", err);

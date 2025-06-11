@@ -5,7 +5,7 @@ use tokio::{
 };
 use utils::{
     conversion::{convert_to_download_proto, convert_to_download_req},
-    rpc::ipc_server::{ManagerCommand, RpcServerHandle as DownloadManagerHandle},
+    rpc::server::{ManagerCommand, RpcServerHandle as DownloadManagerHandle},
     rpc_types::{
         DownloadList, Error as ErrorProto, GetDownload, RpcResponse, rpc_request::Request,
         rpc_response::Response,

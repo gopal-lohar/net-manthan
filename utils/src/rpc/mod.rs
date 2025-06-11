@@ -1,5 +1,6 @@
-pub mod ipc_server;
-
+pub mod client;
+pub mod message_codec;
+pub mod server;
 use std::fmt;
 
 #[derive(Debug, Clone)]

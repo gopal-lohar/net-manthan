@@ -1,5 +1,5 @@
 use crate::{
-    rpc::{RpcConfig, ipc_server::native::start_native_server},
+    rpc::{RpcConfig, server::native::start_native_server},
     rpc_types::{
         Download, DownloadRequest, Error, GetDownload, GetDownloads, RpcRequest, RpcResponse,
         rpc_request::Request, rpc_response::Response,
