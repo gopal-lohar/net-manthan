@@ -111,7 +111,7 @@ async fn main() {
     let mut manager_handle = DownloadManager::new();
 
     // if ipc is Disable it will be handled in the server only
-    let ipc_server = RpcServer::new(&net_manthan_config.rpc_config, manager_handle.clone());
+    let mut ipc_server = RpcServer::new(&net_manthan_config.rpc_config, manager_handle.clone());
     ipc_server.start().await;
 
     for url in cli.urls {
@@ -181,11 +181,13 @@ async fn main() {
                 download_engine::types::DownloadStatus::Complete => true,
                 _ => false,
             })
-            && net_manthan_config.daemon
+            && !net_manthan_config.daemon
         {
             break;
         }
     }
 
     pretty_print_downloads(&mut downloads, false);
+
+    ipc_server.shutdown().await;
 }

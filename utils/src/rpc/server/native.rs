@@ -18,12 +18,10 @@ use crate::rpc::server::RpcServerHandle;
 
 #[derive(Debug)]
 pub struct NativeServerHandle {
-    #[allow(unused)]
     shutdown_tx: oneshot::Sender<()>,
 }
 
 impl NativeServerHandle {
-    #[allow(unused)]
     pub async fn shutdown(self) -> Result<()> {
         let _ = self.shutdown_tx.send(());
         Ok(())

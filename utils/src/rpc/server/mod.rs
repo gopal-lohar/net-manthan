@@ -1,5 +1,8 @@
 use crate::{
-    rpc::{RpcConfig, server::native::start_native_server},
+    rpc::{
+        RpcConfig,
+        server::native::{NativeServerHandle, start_native_server},
+    },
     rpc_types::{
         Download, DownloadRequest, Error, GetDownload, GetDownloads, RpcRequest, RpcResponse,
         rpc_request::Request, rpc_response::Response,
@@ -7,7 +10,7 @@ use crate::{
 };
 use rand::Rng;
 use tokio::sync::{mpsc, oneshot};
-use tracing::info;
+use tracing::{error, info};
 
 mod native;
 
@@ -19,6 +22,8 @@ pub struct ManagerCommand {
 pub struct RpcServer {
     config: RpcConfig,
     handle: RpcServerHandle,
+    // later it can become an enum for all other servers,or just take a onshot channel
+    shutdown_handle: Option<NativeServerHandle>,
 }
 
 impl RpcServer {
@@ -26,23 +31,38 @@ impl RpcServer {
         Self {
             config: config.clone(),
             handle,
+            shutdown_handle: None,
         }
     }
 
-    pub async fn start(&self) {
+    pub async fn start(&mut self) {
         match &self.config {
             RpcConfig::Disabled => {
                 info!("RPC disabled");
             }
             RpcConfig::Native(settings) => {
                 match start_native_server(self.handle.clone(), settings.clone()).await {
-                    Ok(_) => {}
-                    Err(_) => {}
+                    Ok(h) => {
+                        info!("Native Rpc Server Started");
+                        self.shutdown_handle = Some(h);
+                    }
+                    Err(_) => {
+                        error!("Failed to start Native Rpc Server");
+                    }
                 }
             }
             _ => {
                 todo!();
             }
+        }
+    }
+
+    pub async fn shutdown(self) {
+        match self.shutdown_handle {
+            Some(h) => {
+                let _ = h.shutdown().await;
+            }
+            None => {}
         }
     }
 }
