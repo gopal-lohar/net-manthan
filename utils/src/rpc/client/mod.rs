@@ -1,11 +1,13 @@
+use crate::conversion::convert_from_download_proto;
 use crate::rpc::NativeRpcSettings;
 use crate::rpc::message_codec::MessageCodec;
 use crate::rpc_types::rpc_request::Request;
-use crate::rpc_types::{RpcRequest, RpcResponse};
+use crate::rpc_types::{GetDownloads, RpcRequest, RpcResponse, rpc_response};
 use anyhow::{Context, Result};
 use bytes::{Buf, BytesMut};
+use download_engine::Download;
 use prost::Message;
-use rand::Rng;
+use rand::random;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixStream;
 use tokio_util::codec::{Decoder, Encoder};
@@ -39,8 +41,7 @@ impl NativeRpcClient {
 
     /// Send a request and wait for response
     pub async fn send_request(&mut self, req: Request) -> Result<RpcResponse> {
-        let mut rng = rand::rngs::ThreadRng::default();
-        let request_id: u64 = rng.random();
+        let request_id = random::<u64>();
 
         let request = RpcRequest {
             request_id,
@@ -109,6 +110,24 @@ impl NativeRpcClient {
             .await
             .context("Failed to shutdown stream")?;
         Ok(())
+    }
+}
+
+impl NativeRpcClient {
+    pub async fn get_downloads(&mut self) -> Result<Vec<Download>> {
+        let request = Request::GetDownloads(GetDownloads {});
+        let response = self.send_request(request).await?;
+        match response.response {
+            Some(response) => match response {
+                rpc_response::Response::Downloads(downloads) => Ok(downloads
+                    .list
+                    .iter()
+                    .map(|d| convert_from_download_proto(d))
+                    .collect()),
+                _ => Err(anyhow::anyhow!("Unexpected response")),
+            },
+            None => Err(anyhow::anyhow!("Failed to get downloads")),
+        }
     }
 }
 

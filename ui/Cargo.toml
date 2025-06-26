@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 utils = { path = "../utils" }
+download_engine = { path = "../download_engine" }
 tracing.workspace = true
 anyhow.workspace = true
 gpui = { git = "https://github.com/zed-industries/zed", features = [

@@ -1,7 +1,6 @@
+use super::home::Home;
 use gpui::{Entity, IntoElement, Window, div, hsla, prelude::*, rgb};
 use ui::{ParentElement, Pixels, Rems, SharedString};
-
-use super::home::Home;
 
 #[derive(Clone, Copy, PartialEq)]
 enum Tab {
@@ -32,7 +31,7 @@ impl Downloads {
         Self {
             tabs,
             active_tab: Tab::Home,
-            home: cx.new(|_| Home::new()),
+            home: cx.new(|cx| Home::new(cx)),
         }
     }
 }
