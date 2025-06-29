@@ -4,17 +4,17 @@ use anyhow::{Context, Result};
 use bytes::{Buf, BytesMut};
 use prost::Message;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::oneshot;
 use tokio_util::codec::{Decoder, Encoder};
 use tracing::{debug, error, info, warn};
+use crate::rpc::NativeRpcSettings;
+use crate::rpc::server::RpcServerHandle;
 
 #[cfg(windows)]
 use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 
-use crate::rpc::NativeRpcSettings;
 #[cfg(unix)]
-use crate::rpc::server::RpcServerHandle;
+use tokio::net::{UnixListener, UnixStream};
 
 #[derive(Debug)]
 pub struct NativeServerHandle {
@@ -170,25 +170,25 @@ async fn handle_unix_connection(
 
 #[cfg(windows)]
 async fn start_windows_server(
-    handler: Arc<dyn RpcHandler>,
+    handler: RpcServerHandle,
     settings: NativeRpcSettings,
     mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<()> {
     let pipe_name = format!(r"\\.\pipe\{}", settings.address);
-
+    
     info!("Native RPC server listening on named pipe: {}", pipe_name);
 
     tokio::spawn(async move {
         loop {
-            let server = match ServerOptions::new()
-                .first_pipe_instance(false)
-                .create(&pipe_name)
-            {
+            // Create server options for the named pipe
+            let server_options = ServerOptions::new();
+            
+            // Create the named pipe server
+            let server = match server_options.create(&pipe_name) {
                 Ok(server) => server,
                 Err(e) => {
                     error!("Failed to create named pipe server: {}", e);
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                    continue;
+                    break;
                 }
             };
 
@@ -199,17 +199,17 @@ async fn start_windows_server(
                             let handler = handler.clone();
                             tokio::spawn(async move {
                                 if let Err(e) = handle_windows_connection(server, handler).await {
-                                    error!("Error handling Windows pipe connection: {}", e);
+                                    error!("Error handling named pipe connection: {}", e);
                                 }
                             });
                         }
                         Err(e) => {
-                            error!("Failed to connect to named pipe: {}", e);
+                            error!("Failed to connect to named pipe client: {}", e);
                         }
                     }
                 }
                 _ = &mut shutdown_rx => {
-                    info!("Shutting down Windows named pipe server");
+                    info!("Shutting down named pipe server");
                     break;
                 }
             }
@@ -221,16 +221,17 @@ async fn start_windows_server(
 
 #[cfg(windows)]
 async fn handle_windows_connection(
-    mut server: NamedPipeServer,
-    handler: Arc<dyn RpcHandler>,
+    mut pipe: NamedPipeServer,
+    mut handler: RpcServerHandle,
 ) -> Result<()> {
     let mut buffer = BytesMut::new();
     let mut codec = MessageCodec;
 
     loop {
+        // Read data from named pipe
         let mut temp = [0u8; 4096];
-        match server.read(&mut temp).await {
-            Ok(0) => break,
+        match pipe.read(&mut temp).await {
+            Ok(0) => break, // Connection closed
             Ok(n) => {
                 buffer.extend_from_slice(&temp[..n]);
             }
@@ -240,8 +241,9 @@ async fn handle_windows_connection(
             }
         }
 
+        // Process complete messages
         while let Some(message_data) = codec.decode(&mut buffer)? {
-            let request: RpcRequest = match serde_json::from_slice(&message_data) {
+            let request: RpcRequest = match RpcRequest::decode(message_data.chunk()) {
                 Ok(req) => req,
                 Err(e) => {
                     error!("Failed to deserialize request: {}", e);
@@ -249,15 +251,19 @@ async fn handle_windows_connection(
                 }
             };
 
-            debug!("Received request: {} {}", request.id, request.method);
+            debug!("Received request: {}", request.request_id);
 
             let response = handler.handle_call(request).await;
-            let response_data = serde_json::to_vec(&response)?;
+            let mut response_data = Vec::with_capacity(response.encoded_len());
+            if let Err(e) = response.encode(&mut response_data) {
+                error!("Failed to encode response into bytes: {}", e);
+                break;
+            }
 
             let mut encoded = BytesMut::new();
             codec.encode(response_data, &mut encoded)?;
 
-            if let Err(e) = server.write_all(&encoded).await {
+            if let Err(e) = pipe.write_all(&encoded).await {
                 error!("Failed to write response to named pipe: {}", e);
                 break;
             }

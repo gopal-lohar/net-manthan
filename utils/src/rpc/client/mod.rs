@@ -9,34 +9,66 @@ use download_engine::Download;
 use prost::Message;
 use rand::random;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::UnixStream;
 use tokio_util::codec::{Decoder, Encoder};
 use tracing::debug;
+
+#[cfg(unix)]
+use tokio::net::UnixStream;
+
+#[cfg(windows)]
+use tokio::net::windows::named_pipe::{ClientOptions, NamedPipeClient};
 
 /// Frame format: [length: u32][data: bytes]
 /// This must match the server's MessageCodec exactly
 
 #[derive(Debug)]
 pub struct NativeRpcClient {
+    #[cfg(unix)]
     stream: UnixStream,
+    #[cfg(windows)]
+    pipe: NamedPipeClient,
     codec: MessageCodec,
     buffer: BytesMut,
 }
 
 impl NativeRpcClient {
-    /// Connect to the Unix socket server
+    /// Connect to the native server (Unix socket or Windows named pipe)
     pub async fn connect(settings: &NativeRpcSettings) -> Result<Self> {
-        let stream = UnixStream::connect(&settings.address)
-            .await
-            .with_context(|| format!("Failed to connect to Unix socket: {}", settings.address))?;
+        #[cfg(unix)]
+        {
+            let stream = UnixStream::connect(&settings.address)
+                .await
+                .with_context(|| format!("Failed to connect to Unix socket: {}", settings.address))?;
 
-        debug!("Connected to Unix socket: {}", settings.address);
+            debug!("Connected to Unix socket: {}", settings.address);
 
-        Ok(Self {
-            stream,
-            codec: MessageCodec,
-            buffer: BytesMut::new(),
-        })
+            Ok(Self {
+                stream,
+                codec: MessageCodec,
+                buffer: BytesMut::new(),
+            })
+        }
+
+        #[cfg(windows)]
+        {
+            let pipe_name = format!(r"\\.\pipe\{}", settings.address);
+            let pipe = ClientOptions::new()
+                .open(&pipe_name)
+                .with_context(|| format!("Failed to connect to named pipe: {}", pipe_name))?;
+
+            debug!("Connected to named pipe: {}", pipe_name);
+
+            Ok(Self {
+                pipe,
+                codec: MessageCodec,
+                buffer: BytesMut::new(),
+            })
+        }
+
+        #[cfg(not(any(unix, windows)))]
+        {
+            anyhow::bail!("Native IPC not supported on this platform");
+        }
     }
 
     /// Send a request and wait for response
@@ -60,9 +92,7 @@ impl NativeRpcClient {
             .context("Failed to encode message frame")?;
 
         // Send the request
-        self.stream
-            .write_all(&encoded)
-            .await
+        self.write_all(&encoded).await
             .context("Failed to write request to stream")?;
 
         debug!("Sent request: {}", request.request_id);
@@ -89,7 +119,7 @@ impl NativeRpcClient {
 
             // Need more data, read from stream
             let mut temp = [0u8; 4096];
-            match self.stream.read(&mut temp).await {
+            match self.read(&mut temp).await {
                 Ok(0) => {
                     return Err(anyhow::anyhow!("Connection closed by server"));
                 }
@@ -103,12 +133,44 @@ impl NativeRpcClient {
         }
     }
 
+    /// Platform-agnostic read implementation
+    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
+        #[cfg(unix)]
+        {
+            self.stream.read(buf).await
+        }
+        #[cfg(windows)]
+        {
+            self.pipe.read(buf).await
+        }
+    }
+
+    /// Platform-agnostic write_all implementation
+    async fn write_all(&mut self, buf: &[u8]) -> Result<(), std::io::Error> {
+        #[cfg(unix)]
+        {
+            self.stream.write_all(buf).await
+        }
+        #[cfg(windows)]
+        {
+            self.pipe.write_all(buf).await
+        }
+    }
+
     /// Close the connection
     pub async fn close(mut self) -> Result<()> {
-        self.stream
-            .shutdown()
-            .await
-            .context("Failed to shutdown stream")?;
+        #[cfg(unix)]
+        {
+            self.stream
+                .shutdown()
+                .await
+                .context("Failed to shutdown stream")?;
+        }
+        #[cfg(windows)]
+        {
+            // Named pipes don't require explicit shutdown
+            // The connection will be closed when the client is dropped
+        }
         Ok(())
     }
 }
