@@ -33,7 +33,11 @@ pub struct Cli {
     #[arg(short = 's', long = "split", value_name = "N", default_value = "10")]
     split: usize,
 
-    /// Enable JSON-RPC/XML-RPC server
+    /// Stay running even if all task at hand are done
+    #[arg(long = "daemon", action = ArgAction::SetTrue)]
+    daemon: bool,
+
+    /// Enable JSON-RPC/PROTOBUFF-RPC server
     #[arg(long = "enable-rpc", action = ArgAction::SetTrue)]
     enable_rpc: bool,
 
@@ -56,7 +60,7 @@ pub struct Cli {
     log_level: String,
 
     /// URLs to download
-    #[arg(required = true)]
+    #[arg()]
     urls: Vec<String>,
 }
 
@@ -74,6 +78,7 @@ async fn main() {
             allow_all_users: true,
             secret: "".into(),
         }),
+        daemon: cli.daemon,
         ..Default::default()
     };
 

@@ -83,7 +83,7 @@ impl Home {
 
                     app_context
                         .background_executor()
-                        .timer(Duration::from_millis(1000))
+                        .timer(Duration::from_millis(400))
                         .await;
                     println!("hihihihihi");
                 }

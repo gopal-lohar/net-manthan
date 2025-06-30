@@ -50,6 +50,8 @@ fn main() {
 
     // NOTE: ui/build.rs builds debug and we run debug here
     let mut _child = Command::new(net_manthan_path())
+        .arg("--daemon")
+        .arg("http://localhost:8080/slow/extra_large.bin")
         .spawn()
         .expect("Failed to start net-manthan");
 
