@@ -1,3 +1,5 @@
+use crate::helpers::theme::Theme;
+
 use super::home::Home;
 use gpui::{Entity, IntoElement, Window, div, hsla, prelude::*, rgb};
 use ui::{ParentElement, Pixels, Rems, SharedString};
@@ -38,6 +40,8 @@ impl Downloads {
 
 impl Render for Downloads {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.global::<Theme>();
+
         div()
             .text_color(rgb(0xffffff))
             .h_full()
@@ -52,7 +56,7 @@ impl Render for Downloads {
                     .p_8()
                     .pr_0()
                     .h_full()
-                    .bg(rgb(0x0D0D16))
+                    .bg(theme.base_blur)
                     .child(
                         div()
                             .text_color(hsla(0.0, 0.0, 0.0, 0.0))

@@ -1,4 +1,7 @@
-use crate::components::{downloads::Downloads, title_bar::TitleBar};
+use crate::{
+    components::{downloads::Downloads, title_bar::TitleBar},
+    helpers::theme::Theme,
+};
 
 use gpui::{Context, Entity, IntoElement, Window, div, prelude::*, rgb};
 use ui::PlatformStyle;
@@ -15,8 +18,10 @@ pub struct NetManthanUi {
 
 impl Render for NetManthanUi {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.global::<Theme>();
+
         div()
-            .bg(rgb(0x000000))
+            .bg(theme.base_blur)
             .w_full()
             .h_full()
             .when(

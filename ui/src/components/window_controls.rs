@@ -1,5 +1,5 @@
-use gpui::{Hsla, svg};
-use ui::prelude::*;
+use crate::helpers::icon::{Icon, IconName};
+use gpui::{App, ElementId, Hsla, Window, div, prelude::*};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub enum WindowControlType {
@@ -120,19 +120,15 @@ impl WindowControl {
 
 impl RenderOnce for WindowControl {
     fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
-        let icon = svg()
-            .size_5()
-            .flex_none()
-            .path(match self.icon {
-                WindowControlType::Minimize => "icons/generic_minimize.svg",
-                WindowControlType::Restore => "icons/generic_restore.svg",
-                WindowControlType::Maximize => "icons/generic_maximize.svg",
-                WindowControlType::Close => "icons/generic_close.svg",
-            })
-            .text_color(self.style.icon)
-            .group_hover("", |this| this.text_color(self.style.icon_hover));
+        let icon = Icon::new(match self.icon {
+            WindowControlType::Minimize => IconName::Minimize,
+            WindowControlType::Restore => IconName::Restore,
+            WindowControlType::Maximize => IconName::Maximize,
+            WindowControlType::Close => IconName::Close,
+        })
+        .text_color(self.style.icon);
 
-        h_flex()
+        div()
             .id(self.id)
             .group("")
             .cursor_pointer()
