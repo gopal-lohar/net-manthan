@@ -38,7 +38,9 @@ impl NativeRpcClient {
         {
             let stream = UnixStream::connect(&settings.address)
                 .await
-                .with_context(|| format!("Failed to connect to Unix socket: {}", settings.address))?;
+                .with_context(|| {
+                    format!("Failed to connect to Unix socket: {}", settings.address)
+                })?;
 
             debug!("Connected to Unix socket: {}", settings.address);
 
@@ -92,7 +94,8 @@ impl NativeRpcClient {
             .context("Failed to encode message frame")?;
 
         // Send the request
-        self.write_all(&encoded).await
+        self.write_all(&encoded)
+            .await
             .context("Failed to write request to stream")?;
 
         debug!("Sent request: {}", request.request_id);
@@ -158,20 +161,19 @@ impl NativeRpcClient {
     }
 
     /// Close the connection
+    #[cfg(unix)]
     pub async fn close(mut self) -> Result<()> {
-        #[cfg(unix)]
-        {
-            self.stream
-                .shutdown()
-                .await
-                .context("Failed to shutdown stream")?;
-        }
-        #[cfg(windows)]
-        {
-            // Named pipes don't require explicit shutdown
-            // The connection will be closed when the client is dropped
-        }
+        self.stream
+            .shutdown()
+            .await
+            .context("Failed to shutdown stream")?;
         Ok(())
+    }
+
+    #[cfg(windows)]
+    pub async fn close(self) -> Result<()> {
+        // Named pipes don't require explicit shutdown
+        // The connection will be closed when the client is dropped
     }
 }
 

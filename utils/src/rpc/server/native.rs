@@ -1,20 +1,22 @@
+use crate::rpc::NativeRpcSettings;
 use crate::rpc::message_codec::MessageCodec;
+use crate::rpc::server::RpcServerHandle;
 use crate::rpc_types::RpcRequest;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use bytes::{Buf, BytesMut};
 use prost::Message;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::oneshot;
 use tokio_util::codec::{Decoder, Encoder};
-use tracing::{debug, error, info, warn};
-use crate::rpc::NativeRpcSettings;
-use crate::rpc::server::RpcServerHandle;
+use tracing::{debug, error, info};
 
 #[cfg(windows)]
 use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 
 #[cfg(unix)]
+use anyhow::Context;
 use tokio::net::{UnixListener, UnixStream};
+use tracing::warn;
 
 #[derive(Debug)]
 pub struct NativeServerHandle {
@@ -175,14 +177,14 @@ async fn start_windows_server(
     mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<()> {
     let pipe_name = format!(r"\\.\pipe\{}", settings.address);
-    
+
     info!("Native RPC server listening on named pipe: {}", pipe_name);
 
     tokio::spawn(async move {
         loop {
             // Create server options for the named pipe
             let server_options = ServerOptions::new();
-            
+
             // Create the named pipe server
             let server = match server_options.create(&pipe_name) {
                 Ok(server) => server,
