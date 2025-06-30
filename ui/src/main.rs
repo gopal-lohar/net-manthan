@@ -20,7 +20,7 @@ struct FsAssets {
 
 #[cfg(not(target_os = "windows"))]
 fn net_manthan_path() -> &'static str {
-    "./target/debug/net-manthan"
+    "/home/titan/code/net-manthan/target/debug/net-manthan"
 }
 
 #[cfg(target_os = "windows")]

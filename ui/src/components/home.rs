@@ -22,7 +22,7 @@ impl Home {
                     // fetch data
                     let downloads = gpui_tokio::Tokio::spawn(&app_context, async move {
                         let client = NativeRpcClient::connect(&NativeRpcSettings {
-                            address: "hellyeah".into(),
+                            address: "/tmp/net-manthan-ipc".into(),
                             allow_all_users: true,
                             secret: "".into(),
                         })

@@ -74,7 +74,7 @@ async fn main() {
         download_config: DownloadConfig::default(),
         max_concurrent_downloads: 10,
         rpc_config: RpcConfig::Native(NativeRpcSettings {
-            address: "hellyeah".into(),
+            address: "/tmp/net-manthan-ipc".into(),
             allow_all_users: true,
             secret: "".into(),
         }),
