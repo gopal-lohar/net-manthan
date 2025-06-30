@@ -174,6 +174,7 @@ impl NativeRpcClient {
     pub async fn close(self) -> Result<()> {
         // Named pipes don't require explicit shutdown
         // The connection will be closed when the client is dropped
+        Ok(())
     }
 }
 

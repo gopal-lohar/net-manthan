@@ -15,7 +15,9 @@ use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 
 #[cfg(unix)]
 use anyhow::Context;
+#[cfg(unix)]
 use tokio::net::{UnixListener, UnixStream};
+#[cfg(unix)]
 use tracing::warn;
 
 #[derive(Debug)]
