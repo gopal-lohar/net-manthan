@@ -1,28 +1,17 @@
-use crate::components::text_input::TextInput;
 use gpui::{Entity, IntoElement, Window, div, hsla, prelude::*, rgb};
 use ui::{Pixels, Rems};
 
+use crate::components::input_control::InputControl;
+
 pub struct AddDownloadDialog {
-    url_input: Entity<TextInput>,
+    url_input: Entity<InputControl>,
     title_bar_height: Pixels,
 }
 
 impl AddDownloadDialog {
     pub fn new(cx: &mut Context<Self>, title_bar_height: Pixels) -> Self {
-        let url_input = cx.new(|cx| TextInput {
-            focus_handle: cx.focus_handle(),
-            content: "".into(),
-            placeholder: "Enter URL to download...".into(),
-            selected_range: 0..0,
-            selection_reversed: false,
-            marked_range: None,
-            last_layout: None,
-            last_bounds: None,
-            is_selecting: false,
-        });
-
         Self {
-            url_input,
+            url_input: InputControl::new(cx),
             title_bar_height,
         }
     }

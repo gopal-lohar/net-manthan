@@ -2,7 +2,7 @@ use gpui::{MouseButton, prelude::*};
 
 use ui::prelude::*;
 
-use crate::components::window_controls::{WindowControl, WindowControlType};
+use crate::components::title_bar::window_controls::{WindowControl, WindowControlType};
 
 #[derive(IntoElement)]
 pub struct LinuxWindowControls {}

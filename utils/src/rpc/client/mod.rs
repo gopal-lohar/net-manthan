@@ -1,10 +1,12 @@
-use crate::conversion::convert_from_download_proto;
+use crate::conversion::{convert_from_download_proto, convert_to_timestamp_proto};
 use crate::rpc::NativeRpcSettings;
 use crate::rpc::message_codec::MessageCodec;
 use crate::rpc_types::rpc_request::Request;
-use crate::rpc_types::{GetDownloads, RpcRequest, RpcResponse, rpc_response};
+use crate::rpc_types::rpc_response::Response;
+use crate::rpc_types::{GetDownloads, HeartBeat, RpcRequest, RpcResponse, rpc_response};
 use anyhow::{Context, Result};
 use bytes::{Buf, BytesMut};
+use chrono::Utc;
 use download_engine::Download;
 use prost::Message;
 use rand::random;
@@ -193,6 +195,20 @@ impl NativeRpcClient {
             },
             None => Err(anyhow::anyhow!("Failed to get downloads")),
         }
+    }
+
+    pub async fn ping(&mut self) -> Result<()> {
+        let request = Request::HeartBeat(HeartBeat {
+            request_timestamp: Some(convert_to_timestamp_proto(&Utc::now())),
+        });
+        let response = self.send_request(request).await?;
+        return match response.response {
+            Some(response) => match response {
+                Response::HearBeat(_) => Ok(()),
+                _ => Err(anyhow::anyhow!("failed to ping")),
+            },
+            None => Err(anyhow::anyhow!("failed to ping")),
+        };
     }
 }
 

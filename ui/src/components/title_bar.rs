@@ -1,10 +1,12 @@
 use gpui::{Decorations, IntoElement, Pixels, Window, div, px, rgb};
 
+use platforms::platform_linux::LinuxWindowControls;
+use platforms::platform_windows::WindowsWindowControls;
 use ui::PlatformStyle;
 use ui::prelude::*;
 
-use crate::platforms::platform_linux::LinuxWindowControls;
-use crate::platforms::platform_windows::WindowsWindowControls;
+mod platforms;
+mod window_controls;
 
 pub struct TitleBar {
     should_move: bool,

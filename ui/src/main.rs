@@ -1,9 +1,10 @@
+use crate::components::input::*;
 use crate::helpers::{
     assets::Assets,
     theme::Theme,
     window::{blur_window, get_window_options},
 };
-use components::{net_manthan_ui::NetManthanUi, text_input::*};
+use components::net_manthan_ui::NetManthanUi;
 use gpui::{App, Application, KeyBinding, prelude::*};
 use std::process::Command;
 use tracing::info;
@@ -11,7 +12,6 @@ use utils::logging::{Component, get_ui_config, init_logging};
 
 pub mod components;
 pub mod helpers;
-pub mod platforms;
 
 #[cfg(not(target_os = "windows"))]
 fn net_manthan_path() -> &'static str {
