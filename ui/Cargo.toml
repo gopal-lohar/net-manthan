@@ -8,6 +8,7 @@ utils = { path = "../utils" }
 download_engine = { path = "../download_engine" }
 tracing.workspace = true
 anyhow.workspace = true
+tokio.workspace = true
 gpui = { git = "https://github.com/zed-industries/zed", rev = "c74ecb4", features = [
     "wayland",
     "x11",

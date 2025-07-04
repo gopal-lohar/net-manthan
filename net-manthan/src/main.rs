@@ -137,7 +137,7 @@ async fn main() {
         //     }))
         //     .await
         send_rpc_request(&NativeRpcSettings {
-            address: "hellyeah".into(),
+            address: "/tmp/net-manthan-ipc".into(),
             allow_all_users: true,
             secret: "".into(),
         }, Request::AddDownload(convert_to_download_req_proto(DownloadRequest {

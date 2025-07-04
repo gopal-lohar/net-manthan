@@ -1,11 +1,13 @@
 use download_engine::Download;
 use gpui::*;
 use gpui_tokio::Tokio;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use utils::rpc::{NativeRpcSettings, client::NativeRpcClient};
 
 pub enum Handle {
     Connecting,
-    Connected(NativeRpcClient),
+    Connected(Arc<Mutex<NativeRpcClient>>),
     Failed,
 }
 
@@ -23,7 +25,7 @@ impl Client {
                 let thread_handle = Tokio::spawn(&app, async move {
                     let client = NativeRpcClient::connect(&settings).await;
                     match client {
-                        Ok(client) => Handle::Connected(client),
+                        Ok(client) => Handle::Connected(Arc::new(Mutex::new(client))),
                         Err(_) => Handle::Failed,
                     }
                 });
@@ -48,35 +50,42 @@ impl Client {
         .detach();
     }
 
-    pub async fn get_downloads(&mut self, cx: &mut AsyncApp) -> Vec<Download> {
-        let downloads = cx.update_entity(&self.handle, move |handle, _| async {
-            let client = match handle {
-                Handle::Connected(client) => client,
-                _ => return vec![],
-            };
-            let cx = cx.clone();
-            let thread_handle = Tokio::spawn(&cx, {
-                async move {
-                    match client.get_downloads().await {
-                        Ok(downloads) => Some(downloads),
-                        Err(_) => None,
-                    }
-                }
-            });
-            match thread_handle {
-                Ok(h) => match h.await {
-                    Ok(d) => return d.unwrap_or(vec![]),
-                    Err(_) => {}
-                },
-                Err(_) => {}
+    pub async fn get_downloads(cx: &mut AsyncApp) -> Vec<Download> {
+        let rpc_client = cx.try_read_global(|client: &Client, cx: &App| {
+            let handle = client.handle.read(cx);
+            if let Handle::Connected(rpc_client) = handle {
+                return Some(rpc_client.clone());
+            } else {
+                return None;
             }
-            return vec![];
         });
 
-        match downloads {
-            Ok(downloads) => downloads.await,
-            Err(_) => vec![],
+        match rpc_client.unwrap_or(None) {
+            Some(rpc_client) => {
+                let cx = cx.clone();
+                let thread_handle = Tokio::spawn(&cx, {
+                    let client = rpc_client.clone();
+                    async move {
+                        let mut client = client.lock().await;
+                        match client.get_downloads().await {
+                            Ok(downloads) => Some(downloads),
+                            Err(_) => None,
+                        }
+                    }
+                });
+
+                match thread_handle {
+                    Ok(h) => match h.await {
+                        Ok(d) => return d.unwrap_or(vec![]),
+                        Err(_) => {}
+                    },
+                    Err(_) => {}
+                }
+            }
+            None => {}
         }
+
+        vec![]
     }
 
     pub fn update(f: impl FnOnce(&mut Self, &mut App), cx: &mut AsyncApp) {

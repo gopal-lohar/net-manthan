@@ -1,10 +1,10 @@
 use std::path::Path;
 
+use crate::helpers::client::Client;
 use download_engine::Download;
 use gpui::{AsyncApp, ClipboardItem, IntoElement, WeakEntity, Window, div, prelude::*, rgb};
 use std::time::Duration;
 use ui::{DefiniteLength, ParentElement, SharedString};
-use utils::rpc::{NativeRpcSettings, client::NativeRpcClient};
 
 pub struct Home {
     downloads: Vec<Download>,
@@ -14,55 +14,13 @@ impl Home {
     pub fn new(cx: &mut Context<Home>) -> Self {
         cx.spawn(|this: WeakEntity<Home>, cx: &mut AsyncApp| {
             // Clone the app context before moving into async block
-            let app_context = cx.clone();
+            let mut app_context = cx.clone();
             async move {
                 loop {
                     println!("before hihihihihih");
 
-                    // fetch data
-                    let downloads = gpui_tokio::Tokio::spawn(&app_context, async move {
-                        let client = NativeRpcClient::connect(&NativeRpcSettings {
-                            address: "/tmp/net-manthan-ipc".into(),
-                            allow_all_users: true,
-                            secret: "".into(),
-                        })
-                        .await;
-                        let downloads = match client {
-                            Ok(mut client) => {
-                                let response = match client.get_downloads().await {
-                                    Ok(downloads) => Some(downloads),
-                                    Err(err) => {
-                                        println!("Error: {}", err);
-                                        None
-                                    }
-                                };
-                                match client.close().await {
-                                    Ok(()) => println!("Client closed successfully"),
-                                    Err(err) => println!("Error closing client: {}", err),
-                                };
-                                response
-                            }
-                            Err(err) => {
-                                println!("Error: {}", err);
-                                None
-                            }
-                        };
-                        downloads
-                    });
-
-                    let data = match downloads {
-                        Ok(downloads) => match downloads.await {
-                            Ok(downloads) => downloads,
-                            Err(err) => {
-                                println!("Error: {}", err);
-                                None
-                            }
-                        },
-                        Err(err) => {
-                            println!("Error: {}", err);
-                            None
-                        }
-                    };
+                    let downloads = Client::get_downloads(&mut app_context).await;
+                    let data = Some(downloads);
 
                     // Schedule update on main thread
                     app_context
