@@ -12,7 +12,7 @@ pub enum Handle {
 }
 
 pub struct Client {
-    handle: Entity<Handle>,
+    pub handle: Entity<Handle>,
 }
 
 impl Client {

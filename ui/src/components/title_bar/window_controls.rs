@@ -138,6 +138,9 @@ impl RenderOnce for WindowControl {
             .size_7()
             .hover(|this| this.bg(self.style.background_hover))
             .active(|this| this.bg(self.style.background_hover))
+            .flex()
+            .items_center()
+            .justify_center()
             .child(icon)
             .on_mouse_move(|_, _, cx| cx.stop_propagation())
             .on_click(move |_, window, cx| {

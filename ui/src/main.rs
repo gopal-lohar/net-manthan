@@ -1,4 +1,5 @@
 use crate::components::input::*;
+use crate::helpers::client::Client;
 use crate::helpers::{
     assets::Assets,
     theme::Theme,
@@ -9,6 +10,7 @@ use gpui::{App, Application, KeyBinding, prelude::*};
 use std::process::Command;
 use tracing::info;
 use utils::logging::{Component, get_ui_config, init_logging};
+use utils::rpc::NativeRpcSettings;
 
 pub mod components;
 pub mod helpers;
@@ -66,6 +68,14 @@ fn main() {
             .open_window(window_options, |window, app| {
                 blur_window(window);
                 Theme::init(app);
+                Client::init(
+                    app,
+                    NativeRpcSettings {
+                        address: "/tmp/net-manthan-ipc".into(),
+                        allow_all_users: true,
+                        secret: "".into(),
+                    },
+                );
                 app.new(|cx| NetManthanUi::new(window, cx))
             })
             .unwrap();
