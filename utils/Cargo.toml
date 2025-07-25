@@ -1,0 +1,18 @@
+[package]
+name = "utils"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+engine = { path = "../engine" }
+tracing.workspace = true
+tokio.workspace = true
+serde.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+bytes = "1.10.1"
+tokio-util = "0.7.15"
+tracing-appender = "0.2.3"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+bincode = { version = "2.0.1", features = ["serde"] }
+colored = "3.0.0"

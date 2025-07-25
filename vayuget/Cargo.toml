@@ -1,0 +1,11 @@
+[package]
+name = "vayuget"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+engine = { path = "../engine" }
+utils = { path = "../utils" }
+tracing.workspace = true
+tokio.workspace = true
+clap = { version = "4.5.41", features = ["derive"] }

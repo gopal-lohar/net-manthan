@@ -1,0 +1,23 @@
+[workspace]
+members = ["engine", "utils", "vayuget"]
+resolver = "2"
+
+[workspace.dependencies]
+chrono = { version = "0.4.41", features = ["serde"] }
+reqwest = { version = "0.12.22", features = ["stream"] }
+serde = { version = "1.0.219", features = ["derive"] }
+thiserror = "2.0.12"
+tokio = { version = "1.46.1", features = [
+    "rt",
+    "rt-multi-thread",
+    "macros",
+    "time",
+    "signal",
+] }
+futures-util = { version = "0.3.31", default-features = false, features = [
+    "std",
+] }
+tracing = "0.1.41"
+uuid = { version = "1.17.0", features = ["v4"] }
+anyhow = "1.0.98"
+rand = "0.9.1"
