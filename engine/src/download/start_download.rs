@@ -1,14 +1,12 @@
-use std::sync::Arc;
-
-use chrono::Utc;
-use tokio::sync::{Mutex, watch};
-use tracing::info;
-
 use crate::types::{
     chunks::{ChunksInfo, DownloadParts},
     download::Download,
     download_handle::{ChunksProgress, DownloadHandle},
+    status::DownloadStatus,
 };
+use chrono::Utc;
+use std::sync::Arc;
+use tokio::sync::{Mutex, watch};
 
 use super::download_part::download_part;
 
@@ -20,19 +18,17 @@ use super::download_part::download_part;
 
 /// start a download, make sure the download file and the download info is already loaded
 pub async fn start_download(download: Download) -> Option<DownloadHandle> {
-    info!("PROPERLY STARTED DOWN 01");
-
     match &download.chunks_info {
         ChunksInfo::InfoLoaded(info_loaded) => {
             let (pause_tx, _) = watch::channel(false);
-            info!("PROPERLY STARTED DOWN");
 
             let mut task_handles = vec![];
             let chunks_progress = match &info_loaded.parts {
                 DownloadParts::Resumable(parts) => {
                     let mut progress_vec = vec![];
                     for part in parts {
-                        let part = part.clone();
+                        let mut part = part.clone();
+                        part.status = DownloadStatus::Downloading;
                         let request = download.request.clone();
                         let info = info_loaded.info.clone();
                         let config = download.config.clone();
@@ -46,7 +42,8 @@ pub async fn start_download(download: Download) -> Option<DownloadHandle> {
                     ChunksProgress::Resumable(progress_vec)
                 }
                 DownloadParts::NonResumable(part) => {
-                    let part = part.clone();
+                    let mut part = part.clone();
+                    part.status = DownloadStatus::Downloading;
                     let request = download.request.clone();
                     let info = info_loaded.info.clone();
                     let config = download.config.clone();

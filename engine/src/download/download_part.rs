@@ -14,6 +14,7 @@ use tokio::{
     io::AsyncSeekExt,
     sync::{Mutex, watch},
 };
+use tracing::warn;
 
 use super::custom_writer::CustomWriter;
 
@@ -112,8 +113,12 @@ impl<T: SizeInfo> UpdateManager<T> {
     async fn update_progress(&mut self, bytes_written: Option<u64>) {
         if let Some(bytes_written) = bytes_written {
             let now = Utc::now();
-            let delta = (now - self.last_flush_time).as_seconds_f64();
-            let speed = (bytes_written as f64 / delta) as u64;
+            let delta = (now - self.last_flush_time).num_milliseconds().abs() as u64;
+            let speed = if delta == 0 {
+                bytes_written
+            } else {
+                bytes_written / delta
+            };
             self.last_flush_time = now;
 
             {
@@ -141,6 +146,7 @@ impl<T: SizeInfo> UpdateManager<T> {
     async fn update_error(&mut self, error: DownloadError) {
         {
             let mut part_progress = self.part_progress.lock().await;
+            warn!("Download error: {}", error);
             part_progress.error = Some(error.to_string());
             part_progress.status = DownloadStatus::Failed;
         }

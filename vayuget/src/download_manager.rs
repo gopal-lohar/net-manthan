@@ -1,11 +1,14 @@
-use std::{collections::VecDeque, time::Duration};
-
+use chrono::{DateTime, Utc};
 use engine::{
     download::start_download::start_download,
     types::{
         chunks::ChunksInfo, download::Download, download_handle::DownloadHandle,
-        request::DownloadRequest,
+        request::DownloadRequest, status::DownloadStatus,
     },
+};
+use std::{
+    collections::{HashMap, VecDeque},
+    time::Duration,
 };
 use tokio::{
     sync::{
@@ -31,26 +34,41 @@ pub struct DownloadManager {
     /// downloads that need to start but don't have info.
     /// As soon as info arrives, it will either be queued or get active
     waiting_info: Vec<i64>,
-    queued: VecDeque<i64>,
+    queue: VecDeque<i64>,
     /// List of dodwnload id's that probably need to be updated in db (i.e. were self.all was changed)
+    ///
+    /// Can be converted into a Hashmap
     dirty: Vec<i64>,
     rpc_server: Option<RpcServer>,
     load_info_tx: Option<Sender<(i64, DownloadRequest)>>,
+    command_sender: Sender<ManagerCommand>,
+    last_updated: DateTime<Utc>,
     max_active_downloads: usize,
+    shutting_down: bool,
+    daemon_mode: bool,
     pretty_print: bool,
 }
 
 impl DownloadManager {
-    pub async fn new(max_active_downloads: usize, pretty_print: bool) -> Self {
+    pub async fn new(
+        max_active_downloads: usize,
+        command_sender: mpsc::Sender<ManagerCommand>,
+        daemon_mode: bool,
+        pretty_print: bool,
+    ) -> Self {
         Self {
             all: Vec::new(),
             active: Vec::new(),
             waiting_info: Vec::new(),
-            queued: VecDeque::new(),
+            queue: VecDeque::new(),
             dirty: Vec::new(),
             rpc_server: None,
             load_info_tx: None,
+            command_sender,
+            last_updated: Utc::now(),
             max_active_downloads,
+            shutting_down: false,
+            daemon_mode,
             pretty_print,
         }
     }
@@ -80,13 +98,75 @@ impl DownloadManager {
     ///
     /// [ ] Write all that in the database
     async fn update(&mut self) {
-        for active_d in &mut self.active {
-            active_d.update_progress().await;
-            self.dirty.push(active_d.id);
+        // we need to do a lot of things with all
+        let mut id_to_index: HashMap<i64, usize> = HashMap::new();
+        for (index, download) in self.all.iter().enumerate() {
+            id_to_index.insert(download.id, index);
         }
-        if self.pretty_print {
-            pretty_print_downloads(&self.active.iter().map(|d| d.core.clone()).collect(), true);
+
+        let now = Utc::now();
+        let delta = now - self.last_updated;
+        for handle in &mut self.active {
+            handle.time_stamps.date_updated = now;
+            handle.time_stamps.active_time += delta;
+            if matches!(handle.get_status(), DownloadStatus::Complete) {
+                handle.time_stamps.date_completed = Some(now);
+            }
+            handle.update_progress().await;
+            if let Some(&index) = id_to_index.get(&handle.core.id) {
+                self.all[index] = handle.core.clone();
+                if !self.dirty.contains(&handle.core.id) {
+                    self.dirty.push(handle.core.id);
+                }
+            }
         }
+        self.last_updated = now;
+
+        if !self.shutting_down && self.pretty_print {
+            pretty_print_downloads(&self.all.iter().map(|d| d.clone()).collect(), true);
+        }
+
+        self.active.retain(|handle| {
+            matches!(
+                handle.get_status(),
+                DownloadStatus::Connecting | DownloadStatus::Retrying | DownloadStatus::Downloading
+            )
+        });
+
+        // Handle the queue
+        if self.active.len() < self.max_active_downloads && self.queue.len() > 0 {
+            if let Some(next) = self.queue.pop_front() {
+                let download = self.all.iter().find(|d| d.id == next);
+                if let Some(download) = download {
+                    self.download(download.clone()).await;
+                }
+            }
+        }
+
+        // in non daemon mode, if no downloads are active and none are in a position to start, just shut down
+        if !self.daemon_mode
+            && !self.shutting_down
+            && !self.all.iter().any(|d| match &d.chunks_info {
+                ChunksInfo::InfoNotLoaded => true,
+                ChunksInfo::Queued => true,
+                ChunksInfo::InfoLoaded(_) => {
+                    matches!(
+                        d.get_status(),
+                        DownloadStatus::Created
+                            | DownloadStatus::Queued
+                            | DownloadStatus::Connecting
+                            | DownloadStatus::Retrying
+                            | DownloadStatus::Downloading
+                    )
+                }
+                _ => false,
+            })
+        {
+            info!("No downloads are currently active. Shutting down...");
+            ManagerCommand::fire_forget(RpcRequest::Shutdown, &self.command_sender).await;
+        }
+
+        // TODO: write dirty downloads
     }
 
     pub async fn run(
@@ -118,9 +198,12 @@ impl DownloadManager {
                         let shutdown = matches!(cmd.request, RpcRequest::Shutdown);
                         self.handle_command(cmd).await;
                         if shutdown{
+                            info!("DownloadManager shutting down");
                             break
                         }
                     } else {
+                        // All senders are dropped, but there may be downloads in progress
+                        // Although there is a sender that won't be dropped, the ctrl_c sender, but we still want to continue, just in case
                         continue;
                     }
                 }
@@ -130,6 +213,16 @@ impl DownloadManager {
         self.update().await;
     }
 
+    fn update_original_download(&mut self, download: Download) {
+        let id = download.id;
+        if let Some(original) = self.all.iter_mut().find(|d| d.id == id) {
+            *original = download;
+            if !self.dirty.contains(&id) {
+                self.dirty.push(id);
+            }
+        }
+    }
+
     /// should only be called if the info has loaded
     /// if slot available, starts the download and delete it from the queue
     /// else add it to the queue
@@ -137,20 +230,26 @@ impl DownloadManager {
         let d_id = download.id;
         if self.active.len() < self.max_active_downloads {
             if let Some(handle) = start_download(download).await {
-                self.queued.retain(|d| *d != d_id);
+                self.queue.retain(|d| *d != d_id);
                 self.active.insert(0, handle);
+                self.active[0].update_progress().await;
+                self.update_original_download(self.active[0].core.clone());
             } // don't need to handle else because info has loaded
         } else {
             trace!(
                 "reached maximum limit for active downloads, pushing {} to queue",
                 d_id
             );
-            if self.queued.iter().find(|d| **d == d_id).is_none() {
-                self.queued.push_back(d_id);
+            if self.queue.iter().find(|d| **d == d_id).is_none() {
+                self.queue.push_back(d_id);
+                if let Some(d) = self.all.iter_mut().find(|d| d.id == d_id) {
+                    d.set_status(DownloadStatus::Queued);
+                };
             }
         }
     }
 
+    /// start a new download (fetches download info if not already loaded)
     async fn download(&mut self, mut download: Download) {
         self.dirty.push(download.id);
         if download.has_info_loaded() {
@@ -175,7 +274,10 @@ impl DownloadManager {
                 }
             }
         }
-        self.all.insert(0, download.clone());
+
+        if self.all.iter().find(|d| d.id == download.id).is_none() {
+            self.all.insert(0, download.clone());
+        }
     }
 
     async fn load_info_routine(
@@ -215,7 +317,9 @@ impl DownloadManager {
                 if let Some(download) = self.all.iter_mut().find(|d| d.id == id) {
                     match maybe_info {
                         Ok(info) => {
-                            download.set_info(info).await;
+                            if !download.has_info_loaded() {
+                                download.set_info(info).await;
+                            }
                         }
                         Err(err) => {
                             download.chunks_info = ChunksInfo::ErrorLoadingInfo(err.to_string());
@@ -228,6 +332,7 @@ impl DownloadManager {
                     let start_download = self.all.iter().find(|d| d.id == id);
                     if let Some(download) = start_download {
                         if download.has_info_loaded() {
+                            // not calling self.download here because that will cause infinite loop
                             self.start_download(download.clone()).await;
                             self.waiting_info.retain(|d| *d != id);
                         }
@@ -235,6 +340,10 @@ impl DownloadManager {
                 }
 
                 RpcResponse::Recieved
+            }
+            RpcRequest::GetDownloads(_) => {
+                let downloads = self.all.iter().map(|d| d.clone()).collect();
+                RpcResponse::Downloads(downloads)
             }
             RpcRequest::Shutdown => {
                 // shutdown handle in caller
@@ -247,8 +356,9 @@ impl DownloadManager {
     }
 
     async fn shutdown(&mut self) {
+        self.shutting_down = true;
         if self.pretty_print {
-            pretty_print_downloads(&self.active.iter().map(|d| d.core.clone()).collect(), false);
+            pretty_print_downloads(&self.all.iter().map(|d| d.clone()).collect(), false);
         }
         info!("Shutting down the Download Manager...");
         if let Some(handle) = self.rpc_server.take() {

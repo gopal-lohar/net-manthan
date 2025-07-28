@@ -13,6 +13,19 @@ const TAB_SPACE: &str = "  ";
 const CLEAR_LINE: &str = "\x1B[K";
 const MOVE_UP: &str = "\x1B[1A";
 
+const CORNER_TOP_LEFT: &str = "┌";
+const CORNER_TOP_RIGHT: &str = "┐";
+const CORNER_BOTTOM_LEFT: &str = "└";
+const CORNER_BOTTOM_RIGHT: &str = "┘";
+const CORNER_TOP_LEFT_ROUND: &str = "╭";
+const CORNER_TOP_RIGHT_ROUND: &str = "╮";
+const CORNER_BOTTOM_LEFT_ROUND: &str = "╰";
+const CORNER_BOTTOM_RIGHT_ROUND: &str = "╯";
+
+const BORDER_HORIZONTAL: &str = "─";
+const BORDER_VERTICAL: &str = "│";
+const PADDING_X: &str = " ";
+
 /// Prints the progress of a vector of downloads in pretty format in terminal
 pub fn pretty_print_downloads(downloads: &Vec<Download>, clear_after_print: bool) {
     // there are 4 goals here
@@ -33,6 +46,9 @@ pub fn pretty_print_downloads(downloads: &Vec<Download>, clear_after_print: bool
 
     let progress_bar_width = 75;
     let max_filename_len = progress_bar_width - 15;
+    let border = true;
+    let rounded = false;
+    let download_height = if border { 5 } else { 4 };
 
     println!("{CLEAR_LINE}");
     for (index, download) in &mut downloads.iter().enumerate() {
@@ -96,47 +112,153 @@ pub fn pretty_print_downloads(downloads: &Vec<Download>, clear_after_print: bool
             format!("{}/{}", time_elapsed.yellow(), eta.yellow()).normal()
         };
 
+        let border_left = if border {
+            format!("{BORDER_VERTICAL}{PADDING_X}")
+        } else {
+            String::new()
+        }
+        .bright_black();
+        let border_right = if border {
+            format!("{PADDING_X}{BORDER_VERTICAL}")
+        } else {
+            String::new()
+        }
+        .bright_black();
+
+        let border_top = if border {
+            format!(
+                "{TAB_SPACE}{}{}{}",
+                if rounded {
+                    CORNER_TOP_LEFT_ROUND
+                } else {
+                    CORNER_TOP_LEFT
+                },
+                BORDER_HORIZONTAL.repeat(progress_bar_width + 2),
+                if rounded {
+                    CORNER_TOP_RIGHT_ROUND
+                } else {
+                    CORNER_TOP_RIGHT
+                }
+            )
+        } else {
+            String::new()
+        }
+        .bright_black();
+
+        let border_bottom = if border {
+            format!(
+                "{TAB_SPACE}{}{}{}",
+                if rounded {
+                    CORNER_BOTTOM_LEFT_ROUND
+                } else {
+                    CORNER_BOTTOM_LEFT
+                },
+                BORDER_HORIZONTAL.repeat(progress_bar_width + 2),
+                if rounded {
+                    CORNER_BOTTOM_RIGHT_ROUND
+                } else {
+                    CORNER_BOTTOM_RIGHT
+                }
+            )
+        } else {
+            String::new()
+        }
+        .bright_black();
+
+        let stats = format!(
+            "{}{}/{}({}) Parts:{} Speed:{} Time:{}{}",
+            if border { "" } else { "[" },
+            downloaded,
+            total,
+            percentage.blue(),
+            parts,
+            current_speed,
+            time,
+            if border { "" } else { "]" }
+        );
+
         // clear the line, go to next line, clear the line, add a tab then do the business
         println!(
-            "{CLEAR_LINE}\n{CLEAR_LINE}{TAB_SPACE}{}. {} {}{}",
+            "{CLEAR_LINE}{}\n{CLEAR_LINE}{TAB_SPACE}{}{}. {} {}{}{}",
+            border_top,
+            border_left,
             index + 1,
             filename,
             " ".repeat(
                 progress_bar_width - (4 + filename.chars().count() + status.chars().count())
             ),
             status,
+            border_right
         );
         println!(
-            "{CLEAR_LINE}{TAB_SPACE}[{}/{}({}) Parts:{} Speed:{} Time:{}]",
-            downloaded,
-            total,
-            percentage.blue(),
-            parts,
-            current_speed,
-            time
+            "{CLEAR_LINE}{TAB_SPACE}{}{}{}{}",
+            border_left,
+            stats,
+            " ".repeat({
+                let len = visible_length(&stats);
+                if len <= progress_bar_width {
+                    progress_bar_width - len
+                } else {
+                    0
+                }
+            }),
+            border_right,
         );
-        print_progress_string(
-            download.progress_percentage().unwrap_or(0.),
-            progress_bar_width,
+        println!(
+            "{TAB_SPACE}{}{}{}",
+            border_left,
+            get_progress_string(
+                download.progress_percentage().unwrap_or(0.),
+                progress_bar_width,
+            ),
+            border_right
         );
+        if border {
+            println!("{}", border_bottom);
+        }
     }
 
     println!("{CLEAR_LINE}");
     if clear_after_print {
-        print!("{}", format!("{MOVE_UP}").repeat((downloads.len() * 4) + 2));
+        print!(
+            "{}",
+            format!("{MOVE_UP}").repeat((downloads.len() * download_height) + 2)
+        );
     }
 }
 
-fn print_progress_string(progress: f64, width: usize) {
+fn get_progress_string(progress: f64, width: usize) -> String {
     let progress = if progress == 100.0 {
         100.0
     } else {
         progress % (100 as f64)
     };
     let green_bars = ((width as f64) * (progress / (100 as f64))).round() as usize;
-    println!(
-        "{TAB_SPACE}{}{}",
+    format!(
+        "{}{}",
         "━".repeat(green_bars).green(),
-        "━".repeat(width - green_bars).bright_black()
+        "━".repeat(width - green_bars).bright_black(),
     )
+}
+
+fn visible_length(s: &str) -> usize {
+    let mut in_escape = false;
+    let mut count = 0;
+
+    for c in s.chars() {
+        if in_escape {
+            // Inside escape sequence - look for termination
+            if c == 'm' {
+                in_escape = false;
+            }
+        } else if c == '\x1b' {
+            // Start of escape sequence
+            in_escape = true;
+        } else {
+            // Regular visible character
+            count += 1;
+        }
+    }
+
+    count
 }

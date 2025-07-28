@@ -9,12 +9,14 @@ static INIT: Once = Once::new();
 /// Application component identifier
 pub enum Component {
     Ui,
+    Vayuget,
 }
 
 impl Component {
     pub fn as_str(&self) -> &'static str {
         match self {
             Component::Ui => "ui",
+            Component::Vayuget => "vayuget",
         }
     }
 }

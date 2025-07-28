@@ -1,13 +1,13 @@
 // This binary is not an application, it is something that takes arguments and works on the basis of that, no management of any db, logs or cache. the application part will be handled my ui.
 
-use clap::{ArgAction, Parser};
+use clap::{ArgAction, Parser, builder::BoolishValueParser};
 use download_manager::DownloadManager;
 use engine::types::{
     messages::DownloadRequestMessage,
     request::{DownloadRequest, Headers},
 };
 use tokio::sync::mpsc;
-use tracing::{Level, error};
+use tracing::Level;
 use utils::{
     logger::{Component, LogConfig, get_engine_silent_deps, init_logger},
     rpc::{messages::RpcRequest, server::ManagerCommand},
@@ -37,6 +37,18 @@ pub struct Cli {
     )]
     daemon: bool,
 
+    /// Control pretty printing (default: true unless --daemon is used)
+    #[arg(
+        long = "pretty-print",
+        action = ArgAction::Set,
+        num_args = 0..=1,         // Accepts 0 or 1 arguments
+        require_equals = true,     // Requires '=' for values
+        default_missing_value = "true", // --pretty-print => true
+        value_parser = BoolishValueParser::new(),
+        help = "Pretty-print output [auto: !daemon, allow: true|false]"
+    )]
+    pretty_print: Option<bool>,
+
     /// Authorization token for RPC access
     #[arg(
         long = "rpc-secret",
@@ -44,6 +56,16 @@ pub struct Cli {
         help = "Secures RPC communication [default: no authentication]"
     )]
     rpc_secret: Option<String>,
+
+    /// Directory for storing the download file in non-daemon mode
+    #[arg(
+        short = 'd',
+        long = "dir",
+        value_name = "PATH",
+        default_value = ".",
+        help = "Log directory [required for file logging]"
+    )]
+    dir: String,
 
     /// Set logging verbosity level
     #[arg(
@@ -59,14 +81,13 @@ pub struct Cli {
     #[arg(
         short = 'l',
         long = "log-dir",
-        value_name = "PATH",
+        value_name = "LOG_PATH",
         help = "Log directory [required for file logging]"
     )]
     log_dir: Option<String>,
 
     /// Database file path
     #[arg(
-        short = 'd',
         long = "database",
         value_name = "FILE",
         help = "SQLite database file [required for persistent storage]"
@@ -120,7 +141,7 @@ async fn main() {
     };
 
     match init_logger(LogConfig {
-        component: Component::Ui,
+        component: Component::Vayuget,
         log_dir: cli.log_dir.clone(),
         max_level: log_level,
         log_to_console: true,
@@ -136,7 +157,13 @@ async fn main() {
 
     let shutdown_tx = ctrl_c::ctrl_c();
     let (sender, receiver) = mpsc::channel::<ManagerCommand>(10);
-    let mut download_manager = DownloadManager::new(5, true).await;
+    let mut download_manager = DownloadManager::new(
+        3,
+        sender.clone(),
+        cli.daemon,
+        cli.pretty_print.unwrap_or(!cli.daemon),
+    )
+    .await;
     if cli.daemon {
         tracing::info!("Starting vayu rpc server");
         download_manager
@@ -144,31 +171,22 @@ async fn main() {
             .await;
     } else {
         tracing::info!("Starting direct download of {} URLs", cli.urls.len());
-        let sender = sender.clone();
-        tokio::task::spawn(async move {
-            for url in cli.urls {
-                match ManagerCommand::send(
-                    RpcRequest::DownloadRequest(DownloadRequestMessage {
-                        request: DownloadRequest {
-                            url,
-                            directory: "./".into(),
-                            rename: None,
-                            headers: Headers::none(),
-                        },
-                        config: None,
-                        info: None,
-                    }),
-                    &sender,
-                )
-                .await
-                {
-                    Ok(_) => {}
-                    Err(err) => {
-                        error!("Failed to send download request: {}", err);
-                    }
-                };
-            }
-        });
+        for url in cli.urls {
+            ManagerCommand::fire_forget(
+                RpcRequest::DownloadRequest(DownloadRequestMessage {
+                    request: DownloadRequest {
+                        url,
+                        directory: cli.dir.clone(),
+                        rename: None,
+                        headers: Headers::none(),
+                    },
+                    config: None,
+                    info: None,
+                }),
+                &sender,
+            )
+            .await
+        }
     };
     download_manager.run(receiver, sender, shutdown_tx).await;
 

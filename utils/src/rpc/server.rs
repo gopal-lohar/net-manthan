@@ -1,7 +1,7 @@
 use super::{
     RpcConfig,
     messages::{MAGIC_RESPONSE, Message, Payload, RpcRequest, RpcResponse},
-    native_rpc::{NativeServerHandle, start_native_server},
+    native_rpc_server::{NativeServerHandle, start_native_server},
 };
 use anyhow::Context;
 use tokio::sync::{mpsc, oneshot};
@@ -24,6 +24,15 @@ impl ManagerCommand {
         };
         sender.send(command).await?;
         recv.await.context("Error Recieving the response")
+    }
+
+    pub async fn fire_forget(request: RpcRequest, sender: &mpsc::Sender<Self>) {
+        let (send, _) = oneshot::channel();
+        let command = Self {
+            request,
+            respond_to: send,
+        };
+        let _ = sender.send(command).await;
     }
 }
 

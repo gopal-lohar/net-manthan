@@ -12,7 +12,8 @@ use super::{
 use crate::helpers::random::generate_random_id;
 use chrono::Duration;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::path::PathBuf;
+use tracing::{info, trace, warn};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Download {
@@ -77,6 +78,24 @@ impl Download {
         }
     }
 
+    /// if info has loaded then set status for all parts, else do nothing. if info hasn't loaded then please handle it in self.chunks_info yourselves
+    pub fn set_status(&mut self, status: DownloadStatus) {
+        if self.has_info_loaded() {
+            if let ChunksInfo::InfoLoaded(loaded) = &mut self.chunks_info {
+                match &mut loaded.parts {
+                    DownloadParts::NonResumable(part) => {
+                        part.status = status;
+                    }
+                    DownloadParts::Resumable(parts) => {
+                        for part in parts {
+                            part.status = status.clone();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn aggregate_parts_status(parts: &[ResumablePart]) -> Option<DownloadStatus> {
         // Created: Either all or none
         // Queued: Either all or none
@@ -132,14 +151,17 @@ impl Download {
     }
 
     pub async fn set_info(&mut self, mut info: DownloadInfo) {
-        let final_file_name = resolve_file_name_conflict(&info.file_name).await;
+        let final_file_name =
+            resolve_file_name_conflict(&self.request.directory, &info.file_name).await;
         self.chunks_info = match final_file_name {
             Some(name) => {
                 info.file_name = name.clone();
-                match tokio::fs::File::create(name).await {
+                let file_path = self.request.get_file_path(&info);
+                match tokio::fs::File::create(file_path).await {
                     Ok(_) => ChunksInfo::InfoLoaded(ChunksInfoLoaded {
                         parts: match &info.size {
                             Some(size) => {
+                                trace!("Download size for {} is {}", name, size);
                                 let size = *size;
                                 if size == 0 {
                                     DownloadParts::NonResumable(NonResumablePart {
@@ -187,16 +209,22 @@ impl Download {
                         },
                         info,
                     }),
-                    Err(err) => ChunksInfo::ErrorCreatingFile(
-                        DownloadError::FileSystemError(err).to_string(),
-                        info,
-                    ),
+                    Err(err) => {
+                        warn!("Error creating file: {}", err);
+                        ChunksInfo::ErrorCreatingFile(
+                            DownloadError::FileSystemError(err).to_string(),
+                            info,
+                        )
+                    }
                 }
             }
-            None => ChunksInfo::TooManyFileConflicts(
-                DownloadError::TooManyFileConflicts.to_string(),
-                info,
-            ),
+            None => {
+                warn!("Too many file conflicts");
+                ChunksInfo::TooManyFileConflicts(
+                    DownloadError::TooManyFileConflicts.to_string(),
+                    info,
+                )
+            }
         };
     }
 
@@ -283,6 +311,10 @@ impl Download {
 
 /// split total size into chunks with ~equal size
 fn calculate_chunks(total_size: u64, num_chunks: u64) -> Vec<(u64, u64)> {
+    info!("Calculating CHUNKS");
+    // if total_size < num_chunks {
+    // vec![(0, total_size - 1)]
+    // } else {
     let base_chunk_size = total_size / num_chunks;
     let remainder = total_size % num_chunks;
     (0..num_chunks)
@@ -297,10 +329,12 @@ fn calculate_chunks(total_size: u64, num_chunks: u64) -> Vec<(u64, u64)> {
             (start, end.min(total_size.saturating_sub(1)))
         })
         .collect()
+    // }
 }
 
-async fn resolve_file_name_conflict(original_name: &str) -> Option<String> {
-    let path = Path::new(original_name);
+async fn resolve_file_name_conflict(dir: &str, original_name: &str) -> Option<String> {
+    let mut path = PathBuf::from(&dir);
+    path.push(original_name);
 
     // If file doesn't exist, use original name
     if !path.exists() {
@@ -323,7 +357,8 @@ async fn resolve_file_name_conflict(original_name: &str) -> Option<String> {
     let mut counter = 1;
     loop {
         let new_name = format!("{file_stem}_({counter}){extension}");
-        let new_path = Path::new(&new_name);
+        let mut new_path = PathBuf::from(&dir);
+        new_path.push(&new_name);
 
         if !new_path.exists() {
             return Some(new_name);

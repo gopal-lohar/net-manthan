@@ -59,6 +59,10 @@ impl DownloadRequest {
         path
     }
 
+    pub fn get_file_path_str(&self, info: &DownloadInfo) -> String {
+        self.get_file_path(info).to_string_lossy().to_string()
+    }
+
     pub fn is_valid_http_url(s: &str) -> bool {
         match Url::parse(s) {
             Ok(url) => url.scheme() == "http" || url.scheme() == "https",
