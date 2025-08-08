@@ -1,5 +1,5 @@
 [workspace]
-members = ["engine", "utils", "vayuget"]
+members = ["engine", "ui", "utils", "vayuget"]
 resolver = "2"
 
 [workspace.dependencies]
