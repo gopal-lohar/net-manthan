@@ -1,7 +1,6 @@
-use tokio::{
-    signal::unix::{SignalKind, signal},
-    sync::oneshot,
-};
+#[cfg(unix)]
+use tokio::{signal::unix::{SignalKind, signal}};
+use tokio::sync::oneshot;
 use tracing::info;
 
 pub fn ctrl_c() -> oneshot::Receiver<()> {
@@ -12,7 +11,7 @@ pub fn ctrl_c() -> oneshot::Receiver<()> {
             tokio::signal::ctrl_c()
                 .await
                 .expect("Failed to listen for ctrl_c signal");
-            println!("\nCtrl+C received. Sending shutdown signal...");
+            info!("\nCtrl+C received. Sending shutdown signal...");
         }
 
         #[cfg(unix)]
