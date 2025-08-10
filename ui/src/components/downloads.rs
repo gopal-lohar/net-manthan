@@ -60,24 +60,31 @@ impl Downloads {
 
         let downloads_column: Element<DownloadsMessage> = match &self.all {
             Ok(downloads) => {
-                for download in downloads {
-                    downloads_column.push(download_view(&download));
+                if downloads.is_empty() {
+                    Column::new()
+                        .push(text("No downloads").center().width(Length::Fill))
+                        .width(Length::Fill)
+                        .padding(FONT_SIZE_BODY)
+                        .into()
+                } else {
+                    for download in downloads {
+                        downloads_column.push(download_view(&download));
+                    }
+                    Column::from_vec(downloads_column)
+                        .width(Length::Fill)
+                        .padding(FONT_SIZE_BODY)
+                        .spacing(FONT_SIZE_BODY)
+                        .into()
                 }
-                Column::from_vec(downloads_column)
-                    .width(Length::Fill)
-                    .padding(FONT_SIZE_BODY)
-                    .spacing(FONT_SIZE_BODY)
-                    .into()
             }
             Err(error) => Column::new()
                 .push(
                     text(format!("Error: {}", error))
-                        .style(text::danger)
-                        .size(FONT_SIZE_BODY),
+                        .center()
+                        .width(Length::Fill)
+                        .style(text::danger),
                 )
-                .width(Length::Fill)
                 .padding(FONT_SIZE_BODY)
-                .spacing(FONT_SIZE_BODY)
                 .into(),
         };
 

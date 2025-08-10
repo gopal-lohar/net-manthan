@@ -1,6 +1,10 @@
 use crate::{
     components::{
         custom_title_bar::{TitleBar, TitleBarMessage},
+        dialogs::{
+            Dialog, DialogMessage,
+            add_download::{AddDownload, AddDownloadMessage},
+        },
         downloads::{Downloads, DownloadsMessage},
         icons::{Icon, themed_icon},
     },
@@ -13,7 +17,7 @@ use crate::{
 };
 use iced::{
     Alignment, Element, Length, Padding, Subscription, Task, Theme,
-    widget::{PickList, Space, button, column, container, row, slider, text, toggler},
+    widget::{PickList, Space, button, column, container, row, slider, stack, text, toggler},
     window,
 };
 use std::{sync::Arc, time::Duration};
@@ -28,6 +32,7 @@ pub struct DownloadManager {
     title_bar: TitleBar,
     current_page: Page,
     downloads: Downloads,
+    dialog: Dialog,
     client: Arc<Client>,
 }
 
@@ -39,6 +44,7 @@ impl DownloadManager {
             title_bar: TitleBar::default(),
             current_page: Page::Downloading,
             downloads: Downloads::default(),
+            dialog: Dialog::None,
         }
     }
 }
@@ -80,10 +86,36 @@ impl DownloadManager {
                 )
                 .map(Message::DownloadsMessage)
             }
-            Message::DownloadsMessage(message) => self
-                .downloads
-                .update(message)
-                .map(Message::DownloadsMessage),
+            Message::DownloadsMessage(message) => match message {
+                DownloadsMessage::ShowAddDownloadModal => Task::done(Message::OpenDialog),
+                message => self
+                    .downloads
+                    .update(message)
+                    .map(Message::DownloadsMessage),
+            },
+            Message::DialogMessage(message) => match message {
+                DialogMessage::AddDownload(message) => match message {
+                    AddDownloadMessage::Start(request) => {
+                        let client = Arc::clone(&self.client);
+                        Task::perform(
+                            async move {
+                                let _ = client.send(RpcRequest::DownloadRequest(request)).await;
+                                ()
+                            },
+                            |_| Message::DoNothing,
+                        )
+                    }
+                    _ => self
+                        .dialog
+                        .update(DialogMessage::AddDownload(message))
+                        .map(Message::DialogMessage),
+                },
+                message => self.dialog.update(message).map(Message::DialogMessage),
+            },
+            Message::OpenDialog => {
+                self.dialog = Dialog::AddDownload(AddDownload::default());
+                Task::none()
+            }
             Message::Resized(size) => self
                 .config
                 .ui
@@ -178,7 +210,7 @@ impl DownloadManager {
         .into()
     }
 
-    fn side_bar(&self, collapsed: bool) -> Element<Message> {
+    fn side_bar_view(&self, collapsed: bool) -> Element<Message> {
         let sidebar_button = |icon: Icon, button_text: String, page: Page| {
             let content = row![themed_icon(icon, FONT_SIZE_BODY * 1.25, None)];
             let button = button(
@@ -234,16 +266,9 @@ impl DownloadManager {
     }
 
     pub fn view(&self) -> Element<Message> {
-        let mut view = column![];
-        if self.config.ui.custom_decoration {
-            view = view.push(
-                self.title_bar
-                    .view(self.config.ui.maximized)
-                    .map(Message::TitleBar),
-            );
-        }
+        let title_bar = self.title_bar.view(&self.config.ui).map(Message::TitleBar);
         let content = row![
-            self.side_bar(self.config.ui.size.width < 1100.),
+            self.side_bar_view(self.config.ui.size.width < 1100.),
             match self.current_page {
                 Page::All | Page::Downloading =>
                     self.downloads.view().map(Message::DownloadsMessage),
@@ -251,8 +276,8 @@ impl DownloadManager {
                 _ => text("404").into(),
             }
         ];
-        view = view.push(content);
-        view.into()
+        let dialog = self.dialog.view().map(Message::DialogMessage);
+        column![title_bar, stack![content, dialog]].into()
     }
 
     pub fn window_subscription() -> Subscription<Message> {

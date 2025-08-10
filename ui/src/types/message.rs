@@ -1,5 +1,7 @@
 use super::config::UpdateUiConfig;
-use crate::components::{custom_title_bar::TitleBarMessage, downloads::DownloadsMessage};
+use crate::components::{
+    custom_title_bar::TitleBarMessage, dialogs::DialogMessage, downloads::DownloadsMessage,
+};
 use iced::Size;
 use std::time::Duration;
 
@@ -11,6 +13,8 @@ pub enum Message {
     DownloadsMessage(DownloadsMessage),
     UpdateUiConfig(UpdateUiConfig),
     Periodic(Duration),
+    DialogMessage(DialogMessage),
+    OpenDialog,
     Refetch,
     Navigate(Page),
 }
