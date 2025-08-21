@@ -36,7 +36,7 @@ async fn main() -> iced::Result {
         }
     };
 
-    let mut client = Client::new(
+    let client = Client::new(
         "".into(),
         RpcConfig {
             native_rpc_settings: NativeRpcSettings {

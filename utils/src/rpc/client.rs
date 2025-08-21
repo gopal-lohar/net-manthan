@@ -42,7 +42,7 @@ impl Client {
         }
     }
 
-    pub async fn connect(&mut self) -> Result<()> {
+    pub async fn connect(&self) -> Result<()> {
         let client = NativeRpcClient::connect(&self.config.native_rpc_settings).await?;
         let mut guard = self.client.lock().await;
         *guard = Some(RpcClient::Native(client));

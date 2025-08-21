@@ -34,7 +34,7 @@ impl Default for DownloadConfig {
             buffer_size: 1024 * 256,
             update_interval: 500,
             retry_count: 3,
-            connections_per_server: 2,
+            connections_per_server: 8,
         }
     }
 }

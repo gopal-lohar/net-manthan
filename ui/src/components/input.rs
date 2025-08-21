@@ -7,7 +7,10 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub enum ValidationRule {
     NonEmpty,
-    IsUsize,
+    IsUsize {
+        min: Option<usize>,
+        max: Option<usize>,
+    },
     Custom(Rc<dyn Fn(&str) -> Result<(), String>>),
 }
 
@@ -15,7 +18,9 @@ impl std::fmt::Debug for ValidationRule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ValidationRule::NonEmpty => write!(f, "NonEmpty"),
-            ValidationRule::IsUsize => write!(f, "IsUsize"),
+            ValidationRule::IsUsize { min, max } => {
+                write!(f, "IsUsize(min: {:?}, max: {:?})", min, max)
+            }
             ValidationRule::Custom(_) => write!(f, "Custom(...)"),
         }
     }
@@ -74,8 +79,8 @@ impl ValidatedInput {
         self.with_rule(ValidationRule::NonEmpty)
     }
 
-    pub fn as_usize(self) -> Self {
-        self.with_rule(ValidationRule::IsUsize)
+    pub fn as_usize(self, min: Option<usize>, max: Option<usize>) -> Self {
+        self.with_rule(ValidationRule::IsUsize { min, max })
     }
 
     pub fn custom_validation<F>(self, validator: F) -> Self
@@ -125,13 +130,25 @@ impl ValidatedInput {
                     Ok(())
                 }
             }
-            ValidationRule::IsUsize => {
+            ValidationRule::IsUsize { min, max } => {
                 if self.value.trim().is_empty() {
-                    Ok(())
-                } else if self.value.parse::<usize>().is_err() {
-                    Err("Must be a valid positive number".to_string())
-                } else {
-                    Ok(())
+                    return Ok(());
+                }
+                match self.value.parse::<usize>() {
+                    Ok(value) => {
+                        if let Some(min_val) = min {
+                            if value < *min_val {
+                                return Err(format!("Must be at least {}", min_val));
+                            }
+                        }
+                        if let Some(max_val) = max {
+                            if value > *max_val {
+                                return Err(format!("Must be at most {}", max_val));
+                            }
+                        }
+                        Ok(())
+                    }
+                    Err(_) => Err("Must be a valid positive number".to_string()),
                 }
             }
             ValidationRule::Custom(validator) => validator(&self.value),
