@@ -16,6 +16,7 @@ pub enum Message {
     DialogMessage(DialogMessage),
     OpenDialog,
     Refetch,
+    ConnectAndRefetch,
     Navigate(Page),
 }
 

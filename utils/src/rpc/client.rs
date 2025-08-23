@@ -7,7 +7,9 @@ use super::{
 };
 use crate::rpc::messages::{Message, Payload};
 use anyhow::Result;
+use engine::types::download::Download;
 use tokio::sync::Mutex;
+use tracing::warn;
 
 pub enum ClientRequest {
     Request(RpcRequest),
@@ -71,6 +73,30 @@ impl Client {
         match client.take() {
             Some(RpcClient::Native(client)) => client.close().await,
             None => Ok(()),
+        }
+    }
+
+    pub async fn is_connected(&self) -> bool {
+        self.client.lock().await.is_some()
+    }
+}
+
+impl Client {
+    pub async fn get_downloads(&self) -> Result<Vec<Download>, String> {
+        match self.send(RpcRequest::GetDownloads(vec![])).await {
+            Ok(res) => match res {
+                RpcResponse::Downloads(d) => Ok(d),
+                _ => {
+                    let err = "Invalid Response to ipc request";
+                    warn!("{}", err);
+                    Err(err.to_string())
+                }
+            },
+            Err(err) => {
+                let err = format!("Error getting downloads: {}", err);
+                tracing::error!("{}", err);
+                Err(err)
+            }
         }
     }
 }

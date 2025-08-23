@@ -21,11 +21,8 @@ use iced::{
     window,
 };
 use std::{sync::Arc, time::Duration};
-use tracing::{trace, warn};
-use utils::rpc::{
-    client::Client,
-    messages::{RpcRequest, RpcResponse},
-};
+use tracing::trace;
+use utils::rpc::{client::Client, messages::RpcRequest};
 
 pub struct DownloadManager {
     config: Config,
@@ -61,30 +58,34 @@ impl DownloadManager {
                 self.config.ui.update(message).map(Message::UpdateUiConfig)
             }
             Message::Periodic(_) => Task::done(Message::Refetch),
-            Message::Refetch => {
-                trace!("Refetching the downloads");
+            Message::ConnectAndRefetch => {
+                trace!("connecting");
                 let client = Arc::clone(&self.client);
                 Task::perform(
                     async move {
-                        match client.send(RpcRequest::GetDownloads(vec![])).await {
-                            Ok(res) => match res {
-                                RpcResponse::Downloads(d) => Ok(d),
-                                _ => {
-                                    let err = "Invalid Response to ipc request";
-                                    warn!("{}", err);
-                                    Err(err.to_string())
-                                }
-                            },
-                            Err(err) => {
-                                let err = format!("Error getting downloads: {}", err);
-                                tracing::error!("{}", err);
-                                Err(err)
-                            }
+                        let _ = client.connect().await;
+                        client.get_downloads().await
+                    },
+                    |response| {
+                        if let Err(_) = response {
+                            DownloadsMessage::UpdateDownloads(response)
+                        } else {
+                            DownloadsMessage::UpdateDownloads(response)
                         }
                     },
-                    DownloadsMessage::UpdateDownloads,
                 )
                 .map(Message::DownloadsMessage)
+            }
+            Message::Refetch => {
+                trace!("Refetching the downloads");
+                let client = Arc::clone(&self.client);
+                Task::perform(async move { client.get_downloads().await }, |response| {
+                    if let Err(_) = response {
+                        Message::ConnectAndRefetch
+                    } else {
+                        Message::DownloadsMessage(DownloadsMessage::UpdateDownloads(response))
+                    }
+                })
             }
             Message::DownloadsMessage(message) => match message {
                 DownloadsMessage::ShowAddDownloadModal => Task::done(Message::OpenDialog),
@@ -102,7 +103,11 @@ impl DownloadManager {
                                 let _ = client.send(RpcRequest::DownloadRequest(request)).await;
                                 ()
                             },
-                            |_| Message::DoNothing,
+                            |_| {
+                                Message::DialogMessage(DialogMessage::AddDownload(
+                                    AddDownloadMessage::Hide,
+                                ))
+                            },
                         )
                     }
                     _ => self

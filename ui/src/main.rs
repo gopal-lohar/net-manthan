@@ -1,16 +1,13 @@
-use std::sync::Arc;
-
+use daemon_manager::DaemonManager;
 use download_manager::DownloadManager;
 use iced::{Pixels, Task, application, window};
 use styles::constants::FONT_SIZE_BODY;
 use tracing::Level;
 use types::config::Config;
-use utils::{
-    logger::{Component, LogConfig, get_ui_silent_deps, init_logger},
-    rpc::{NativeRpcSettings, RpcConfig, client::Client},
-};
+use utils::logger::{Component, LogConfig, get_ui_silent_deps, init_logger};
 
 pub mod components;
+pub mod daemon_manager;
 pub mod download_manager;
 pub mod styles;
 pub mod types;
@@ -36,17 +33,8 @@ async fn main() -> iced::Result {
         }
     };
 
-    let client = Client::new(
-        "".into(),
-        RpcConfig {
-            native_rpc_settings: NativeRpcSettings {
-                address: "/tmp/vayu.sock".into(),
-                allow_all_users: true,
-            },
-        },
-    );
-    let _ = client.connect().await;
-    let client = Arc::new(client);
+    let daemon_manager = DaemonManager::new();
+    let client = daemon_manager.get_client_handle().await;
 
     application(
         DOWNLOAD_MANAGER_TITLE,

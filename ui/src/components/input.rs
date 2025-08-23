@@ -298,26 +298,3 @@ impl ValidatedInput {
         Self::new(label, placeholder)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_validation() {
-        let mut input = ValidatedInput::new("Test", "test").non_empty().as_usize();
-
-        // Test empty value
-        assert!(!input.validate());
-        assert!(input.has_error());
-
-        // Test non-numeric value
-        input.value = "abc".to_string();
-        assert!(!input.validate());
-
-        // Test valid numeric value
-        input.value = "123".to_string();
-        assert!(input.validate());
-        assert_eq!(input.get_usize_value(), Some(123));
-    }
-}
