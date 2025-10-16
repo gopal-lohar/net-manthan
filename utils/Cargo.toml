@@ -11,8 +11,8 @@ serde.workspace = true
 anyhow.workspace = true
 chrono.workspace = true
 bytes = "1.10.1"
-tokio-util = "0.7.15"
+tokio-util = "0.7.16"
 tracing-appender = "0.2.3"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 bincode = { version = "2.0.1", features = ["serde"] }
 colored = "3.0.0"
