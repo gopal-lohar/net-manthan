@@ -55,7 +55,7 @@ impl Downloads {
         }
     }
 
-    pub fn view(&self) -> Element<DownloadsMessage> {
+    pub fn view(&self) -> Element<'_, DownloadsMessage> {
         let mut downloads_column = Vec::new();
 
         let downloads_column: Element<DownloadsMessage> = match &self.all {
@@ -125,7 +125,7 @@ impl Downloads {
     }
 }
 
-pub fn download_view(download: &Download) -> Element<DownloadsMessage> {
+pub fn download_view(download: &Download) -> Element<'_, DownloadsMessage> {
     let progress = match download.progress_percentage() {
         Some(p) => (p * 10.).round() as u16,
         None => 0,

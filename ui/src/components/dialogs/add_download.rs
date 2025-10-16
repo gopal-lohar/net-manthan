@@ -290,7 +290,7 @@ impl AddDownload {
         }
     }
 
-    pub fn view(&self) -> Element<AddDownloadMessage> {
+    pub fn view(&self) -> Element<'_, AddDownloadMessage> {
         let modal_header = row![
             text("Add a new Download").size(1.25 * FONT_SIZE_BODY),
             Space::with_width(Fill),

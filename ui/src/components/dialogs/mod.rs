@@ -31,7 +31,7 @@ impl Dialog {
         }
     }
 
-    pub fn view(&self) -> iced::Element<DialogMessage> {
+    pub fn view(&self) -> iced::Element<'_, DialogMessage> {
         match self {
             Dialog::AddDownload(add_download) => {
                 add_download.view().map(DialogMessage::AddDownload)

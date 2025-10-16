@@ -130,7 +130,7 @@ impl DownloadManager {
         }
     }
 
-    pub fn settings_view(&self) -> Element<Message> {
+    pub fn settings_view(&self) -> Element<'_, Message> {
         let theme_picker: Element<UpdateUiConfig> = container(
             PickList::new(
                 vec![
@@ -215,7 +215,7 @@ impl DownloadManager {
         .into()
     }
 
-    fn side_bar_view(&self, collapsed: bool) -> Element<Message> {
+    fn side_bar_view(&self, collapsed: bool) -> Element<'_, Message> {
         let sidebar_button = |icon: Icon, button_text: String, page: Page| {
             let content = row![themed_icon(icon, FONT_SIZE_BODY * 1.25, None)];
             let button = button(
@@ -270,7 +270,7 @@ impl DownloadManager {
         .into();
     }
 
-    pub fn view(&self) -> Element<Message> {
+    pub fn view(&self) -> Element<'_, Message> {
         let title_bar = self.title_bar.view(&self.config.ui).map(Message::TitleBar);
         let content = row![
             self.side_bar_view(self.config.ui.size.width < 1100.),

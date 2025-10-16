@@ -61,7 +61,7 @@ impl TitleBar {
         }
     }
 
-    pub fn view(&self, ui_config: &UiConfig) -> Element<TitleBarMessage> {
+    pub fn view(&self, ui_config: &UiConfig) -> Element<'_, TitleBarMessage> {
         if ui_config.custom_decoration {
             let title_bar_button = |icon: Icon, on_press: TitleBarMessage| {
                 button(themed_icon(icon, FONT_SIZE_BODY * 1.25, None))
