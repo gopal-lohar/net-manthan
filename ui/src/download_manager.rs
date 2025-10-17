@@ -7,6 +7,7 @@ use crate::{
         },
         downloads::{Downloads, DownloadsMessage},
         icons::{Icon, themed_icon},
+        toast::{Toast, ToastMessage, ToastVariant},
     },
     styles::constants::FONT_SIZE_BODY,
     types::{
@@ -31,6 +32,7 @@ pub struct DownloadManager {
     downloads: Downloads,
     dialog: Dialog,
     client: Arc<Client>,
+    toast: Toast,
 }
 
 impl DownloadManager {
@@ -41,6 +43,7 @@ impl DownloadManager {
             title_bar: TitleBar::default(),
             current_page: Page::Downloading,
             downloads: Downloads::default(),
+            toast: Toast::default(),
             dialog: Dialog::None,
         }
     }
@@ -57,6 +60,7 @@ impl DownloadManager {
             Message::UpdateUiConfig(message) => {
                 self.config.ui.update(message).map(Message::UpdateUiConfig)
             }
+            Message::Toast(message) => self.toast.update(message).map(Message::Toast),
             Message::Periodic(_) => Task::done(Message::Refetch),
             Message::ConnectAndRefetch => {
                 trace!("connecting");
@@ -89,6 +93,56 @@ impl DownloadManager {
             }
             Message::DownloadsMessage(message) => match message {
                 DownloadsMessage::ShowAddDownloadModal => Task::done(Message::OpenDialog),
+                DownloadsMessage::ResumeDownload(id) => {
+                    let client = Arc::clone(&self.client);
+                    Task::perform(
+                        async move { client.send(RpcRequest::ResumeDownload(id)).await },
+                        move |response| match response {
+                            Ok(message) => match message {
+                                utils::rpc::messages::RpcResponse::Success => {
+                                    Message::Toast(ToastMessage::Show(
+                                        format!("Download resumed: {id}"),
+                                        ToastVariant::Info,
+                                    ))
+                                }
+                                _ => Message::Toast(ToastMessage::Show(
+                                    format!("Could not resume the Download: {id}"),
+                                    ToastVariant::Error,
+                                )),
+                            },
+                            Err(_) => Message::Toast(ToastMessage::Show(
+                                format!(
+                                    "Something went wrong. Could not resume the Download: {id}"
+                                ),
+                                ToastVariant::Error,
+                            )),
+                        },
+                    )
+                }
+                DownloadsMessage::PauseDownload(id) => {
+                    let client = Arc::clone(&self.client);
+                    Task::perform(
+                        async move { client.send(RpcRequest::PauseDownload(id)).await },
+                        move |response| match response {
+                            Ok(message) => match message {
+                                utils::rpc::messages::RpcResponse::Success => {
+                                    Message::Toast(ToastMessage::Show(
+                                        format!("Download paused: {id}"),
+                                        ToastVariant::Info,
+                                    ))
+                                }
+                                _ => Message::Toast(ToastMessage::Show(
+                                    format!("Could not pause the Download: {id}"),
+                                    ToastVariant::Error,
+                                )),
+                            },
+                            Err(_) => Message::Toast(ToastMessage::Show(
+                                format!("Something went wrong. Could not pause the Download: {id}"),
+                                ToastVariant::Error,
+                            )),
+                        },
+                    )
+                }
                 message => self
                     .downloads
                     .update(message)
@@ -282,7 +336,8 @@ impl DownloadManager {
             }
         ];
         let dialog = self.dialog.view().map(Message::DialogMessage);
-        column![title_bar, stack![content, dialog]].into()
+        let toast = self.toast.view().map(Message::Toast);
+        column![title_bar, stack![content, dialog, toast]].into()
     }
 
     pub fn window_subscription() -> Subscription<Message> {

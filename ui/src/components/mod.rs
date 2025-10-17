@@ -3,3 +3,4 @@ pub mod dialogs;
 pub mod downloads;
 pub mod icons;
 pub mod input;
+pub mod toast;

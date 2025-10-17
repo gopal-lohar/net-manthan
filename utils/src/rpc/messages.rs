@@ -76,9 +76,9 @@ pub enum RpcRequest {
     SetDownloadInfo((i64, Result<DownloadInfo, String>)),
     GetDownload(String),
     GetDownloads(Vec<String>),
-    PauseDownload(String),
+    PauseDownload(i64),
     PauseDownloads(Vec<String>),
-    ResumeDownload(String),
+    ResumeDownload(i64),
     ResumeDownloads(Vec<String>),
     Shutdown,
 }

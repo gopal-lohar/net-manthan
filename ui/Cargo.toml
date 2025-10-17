@@ -8,6 +8,7 @@ engine = { path = "../engine" }
 utils = { path = "../utils" }
 tokio.workspace = true
 tracing.workspace = true
+rand.workspace = true
 iced = { version = "0.13", features = ["tokio", "svg", "image"] }
 rfd = "0.15"
 iced_futures = "0.13"

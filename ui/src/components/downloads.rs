@@ -1,5 +1,5 @@
 use super::icons::{Icon, themed_icon};
-use crate::styles::constants::{BORDER_ROUNDED_RADIUS, FONT_SIZE_BODY};
+use crate::styles::constants::{BORDER_ROUNDED_RADIUS, BORDER_WIDTH, FONT_SIZE_BODY};
 use engine::{
     helpers::format::{format_bytes, format_duration, format_speed},
     types::{download::Download, status::DownloadStatus},
@@ -252,14 +252,16 @@ pub fn download_view(download: &Download) -> Element<'_, DownloadsMessage> {
     )
     .style(move |theme: &Theme| iced::widget::container::Style {
         border: Border {
-            width: 1.,
+            width: BORDER_WIDTH,
             color: theme
-                .extended_palette()
-                .background
-                .weak
-                .color
-                .scale_alpha(0.1),
-            radius: Radius::new(FONT_SIZE_BODY * 0.25),
+                .palette()
+                .text
+                .scale_alpha(if theme.extended_palette().is_dark {
+                    0.01
+                } else {
+                    0.1
+                }),
+            radius: Radius::new(BORDER_ROUNDED_RADIUS),
         },
         ..Default::default()
     })
