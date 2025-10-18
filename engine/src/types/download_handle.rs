@@ -1,3 +1,5 @@
+use crate::types::status::DownloadStatus;
+
 use super::{
     chunks::{ChunksInfo, DownloadParts, NonResumablePart, ResumablePart},
     download::Download,
@@ -5,6 +7,7 @@ use super::{
 use chrono::{DateTime, Utc};
 use futures_util::future::join_all;
 use std::{
+    mem,
     ops::{Deref, DerefMut},
     sync::Arc,
 };
@@ -19,9 +22,27 @@ pub struct DownloadHandle {
 }
 
 impl DownloadHandle {
-    pub async fn pause(self) {
+    pub async fn pause(&mut self) {
         let _ = self.pause_tx.send(true);
-        let _ = join_all(self.task_handles).await;
+        let _ = join_all(mem::take(&mut self.task_handles)).await;
+        match &self.chunks_progress {
+            ChunksProgress::Resumable(parts) => {
+                for part in parts {
+                    let mut p = part.lock().await;
+                    p.status = DownloadStatus::Paused;
+                    p.error = None;
+                    p.current_speed = 0;
+                }
+            }
+            ChunksProgress::NonResumable(part) => {
+                let mut p = part.lock().await;
+                p.status = DownloadStatus::Paused;
+                p.error = None;
+                p.bytes_downloaded = 0;
+                p.current_speed = 0;
+            }
+        }
+        self.update_progress().await;
     }
 
     pub async fn update_progress(&mut self) {

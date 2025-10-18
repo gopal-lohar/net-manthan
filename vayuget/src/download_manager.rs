@@ -349,6 +349,24 @@ impl DownloadManager {
                 // shutdown handle in caller
                 RpcResponse::Recieved
             }
+            RpcRequest::PauseDownload(id) => {
+                debug!("Reqest for pause {id}");
+                if let Some(index) = self.active.iter().position(|d| d.id == id) {
+                    self.active[index].pause().await;
+                    RpcResponse::Success
+                } else {
+                    RpcResponse::Error("Download not found".into())
+                }
+            }
+            RpcRequest::ResumeDownload(id) => {
+                debug!("Reqest for resume {id}");
+                if let Some(download) = self.all.iter().find(|d| d.id == id) {
+                    self.download(download.clone()).await;
+                    RpcResponse::Success
+                } else {
+                    RpcResponse::Error("Download not found".into())
+                }
+            }
             _ => RpcResponse::RequestNotSupported,
         };
 

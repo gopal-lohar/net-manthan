@@ -12,3 +12,19 @@ pub enum DownloadStatus {
     Failed,
     Cancelled,
 }
+
+impl DownloadStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            DownloadStatus::Created => "Created",
+            DownloadStatus::Queued => "Queued",
+            DownloadStatus::Connecting => "Connecting",
+            DownloadStatus::Retrying => "Retrying",
+            DownloadStatus::Downloading => "Downloading",
+            DownloadStatus::Paused => "Paused",
+            DownloadStatus::Complete => "Complete",
+            DownloadStatus::Failed => "Failed",
+            DownloadStatus::Cancelled => "Cancelled",
+        }
+    }
+}

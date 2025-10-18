@@ -131,7 +131,10 @@ pub fn download_view(download: &Download) -> Element<'_, DownloadsMessage> {
         None => 0,
     };
     let downloading = download.get_status() == DownloadStatus::Downloading;
+    let completed = download.get_status() == DownloadStatus::Complete;
     let unknown_filename: String = "Filename Unknown".into();
+    let active_time = format_duration(download.time_stamps.active_time);
+
     container(
         column![
             column![
@@ -139,28 +142,28 @@ pub fn download_view(download: &Download) -> Element<'_, DownloadsMessage> {
                     text(download.get_filename().unwrap_or(unknown_filename))
                         .size(FONT_SIZE_BODY)
                         .width(Length::Fill),
-                    container(
+                    container(if completed {
+                        button("").style(button::text)
+                    } else {
                         button(themed_icon(
                             if downloading { Icon::Pause } else { Icon::Play },
                             1.5 * FONT_SIZE_BODY,
-                            None
+                            None,
                         ))
                         .on_press(if downloading {
                             DownloadsMessage::PauseDownload(download.id)
                         } else {
                             DownloadsMessage::ResumeDownload(download.id)
                         })
-                        .style(move |theme, status| {
-                            iced::widget::button::Style {
-                                border: Border {
-                                    radius: Radius::new(BORDER_ROUNDED_RADIUS),
-                                    ..Default::default()
-                                },
-                                ..button::text(theme, status)
-                            }
+                        .style(move |theme, status| iced::widget::button::Style {
+                            border: Border {
+                                radius: Radius::new(BORDER_ROUNDED_RADIUS),
+                                ..Default::default()
+                            },
+                            ..button::text(theme, status)
                         })
                         .padding(0.25 * FONT_SIZE_BODY)
-                    ),
+                    }),
                     container(
                         button(themed_icon(Icon::Info, 1.5 * FONT_SIZE_BODY, None))
                             .style(move |theme, status| {
@@ -191,13 +194,19 @@ pub fn download_view(download: &Download) -> Element<'_, DownloadsMessage> {
                     )),
                     Space::new(Length::Fill, 0),
                     text(format!(
-                        "{} | {} / {}",
+                        "{} | {}",
                         format_speed(download.total_speed()),
-                        format_duration(download.time_stamps.active_time),
-                        match download.estimated_time_remaining() {
-                            Some(t) => format_duration(t),
-                            None => "Unknown".into(),
-                        },
+                        match download.get_status() {
+                            DownloadStatus::Downloading => format!(
+                                "{} / {}",
+                                format_duration(download.time_stamps.active_time),
+                                match download.estimated_time_remaining() {
+                                    Some(t) => format_duration(t),
+                                    None => "Unknown".into(),
+                                }
+                            ),
+                            _ => format!("{} {}", download.get_status().as_str(), active_time),
+                        }
                     ))
                 ]
                 .spacing(FONT_SIZE_BODY)

@@ -44,7 +44,7 @@ impl<T: SizeInfo> DownloadPart<T> {
     }
 
     pub fn apply_header(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
-        self.size_info.apply_headers(request)
+        self.size_info.apply_headers(request, self.bytes_downloaded)
     }
 
     pub fn get_write_head(&self) -> u64 {
@@ -60,7 +60,11 @@ impl<T: SizeInfo> DownloadPart<T> {
 pub trait SizeInfo {
     fn total_size(&self) -> Option<u64>;
     fn is_resumable(&self) -> bool;
-    fn apply_headers(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder;
+    fn apply_headers(
+        &self,
+        request: reqwest::RequestBuilder,
+        bytes_downloaded: u64,
+    ) -> reqwest::RequestBuilder;
     fn get_start_byte(&self) -> u64;
 }
 
@@ -85,10 +89,18 @@ impl SizeInfo for ResumableInfo {
         true
     }
 
-    fn apply_headers(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+    fn apply_headers(
+        &self,
+        request: reqwest::RequestBuilder,
+        bytes_downloaded: u64,
+    ) -> reqwest::RequestBuilder {
         request.header(
             "Range",
-            format!("bytes={}-{}", self.get_start_byte(), self.end_byte),
+            format!(
+                "bytes={}-{}",
+                self.get_start_byte() + bytes_downloaded,
+                self.end_byte
+            ),
         )
     }
 
@@ -106,7 +118,7 @@ impl SizeInfo for NonResumableInfo {
         false
     }
 
-    fn apply_headers(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+    fn apply_headers(&self, request: reqwest::RequestBuilder, _: u64) -> reqwest::RequestBuilder {
         request
     }
 
