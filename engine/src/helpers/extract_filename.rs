@@ -1,6 +1,7 @@
 use reqwest::header::{CONTENT_DISPOSITION, HeaderMap};
 use tracing::trace;
 use url::Url;
+use percent_encoding::percent_decode_str;
 
 /// Extract filename from response headers and URL
 ///
@@ -25,12 +26,23 @@ pub fn extract_filename(headers: &HeaderMap, url: &str) -> Option<String> {
 /// Extract filename from URL
 fn extract_filename_from_url(url_str: &str) -> Option<String> {
     let url = Url::parse(url_str).ok()?;
-    let path = url.path();
-    if path.ends_with('/') {
+    
+    // Use path_segments for proper decoding and handling of path parts
+    let filename_with_query = url.path_segments()? // This should return an iterator of DECODED segments
+                          .last()? // Get the last segment
+                          .to_string(); // Convert to String
+
+    // Strip any potential query parameters that might be part of the last segment
+    let filename = filename_with_query.split('?').next().unwrap_or(&filename_with_query);
+
+    if filename.is_empty() || filename.ends_with('/') { // Check for empty or directory-like filename
         return None;
     }
-    let filename = path.split('/').filter(|s| !s.is_empty()).next_back()?;
-    (!filename.is_empty()).then_some(sanitize_filename(filename))
+    
+    // Explicitly percent-decode here to see if it fixes the test
+    let decoded_filename = percent_decode_str(filename).decode_utf8().ok()?;
+
+    (!decoded_filename.is_empty()).then_some(sanitize_filename(&decoded_filename))
 }
 
 /// Extract filename from HTTP headers from Reqwest crate
@@ -69,7 +81,7 @@ fn extract_filename_from_headers(headers: &HeaderMap) -> Option<String> {
         // Handle UTF-8 encoding format: UTF-8''filename
         if value.starts_with("UTF-8''") || value.starts_with("utf-8''") {
             let encoded_filename = value.split('\'').nth(2)?;
-            let decoded = percent_decode(encoded_filename);
+            let decoded = percent_decode_str(encoded_filename).decode_utf8().ok()?;
             if !decoded.is_empty() {
                 return Some(sanitize_filename(&decoded));
             }
@@ -86,54 +98,6 @@ fn extract_filename_from_headers(headers: &HeaderMap) -> Option<String> {
     None
 }
 
-/// URL-decode a percent-encoded string
-fn percent_decode(input: &str) -> String {
-    let mut output = String::with_capacity(input.len());
-    let mut bytes = input.bytes().peekable();
-
-    while let Some(byte) = bytes.next() {
-        if byte == b'%' {
-            let hex1 = bytes.next();
-            let hex2 = bytes.next();
-
-            if let (Some(h1), Some(h2)) = (hex1, hex2) {
-                if let (Some(d1), Some(d2)) = (decode_hex_digit(h1), decode_hex_digit(h2)) {
-                    let decoded_byte = (d1 << 4) | d2;
-                    // Add as UTF-8 character
-                    output.push(decoded_byte as char);
-                    continue;
-                }
-            }
-
-            // If we can't decode, just add the percent sign and continue
-            output.push('%');
-            if let Some(h1) = hex1 {
-                output.push(h1 as char);
-            }
-            if let Some(h2) = hex2 {
-                output.push(h2 as char);
-            }
-        } else if byte == b'+' {
-            // In some encodings, + represents space
-            output.push(' ');
-        } else {
-            output.push(byte as char);
-        }
-    }
-
-    output
-}
-
-/// Convert a hex character to its decimal value
-fn decode_hex_digit(digit: u8) -> Option<u8> {
-    match digit {
-        b'0'..=b'9' => Some(digit - b'0'),
-        b'A'..=b'F' => Some(digit - b'A' + 10),
-        b'a'..=b'f' => Some(digit - b'a' + 10),
-        _ => None,
-    }
-}
-
 /// Sanitize filename by removing invalid characters
 fn sanitize_filename(filename: &str) -> String {
     // List of characters not allowed in filenames on most platforms
@@ -145,11 +109,120 @@ fn sanitize_filename(filename: &str) -> String {
         .collect();
 
     // Trim leading/trailing whitespace and dots
-    let sanitized = sanitized.trim().trim_start_matches('.');
+    let sanitized = sanitized.trim().trim_start_matches('.').to_string();
 
-    if sanitized.is_empty() {
+    if sanitized.is_empty() || sanitized.chars().all(|c| c == '_') {
         String::from("unnamed_file")
     } else {
-        sanitized.to_string()
+        sanitized
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use reqwest::header::{HeaderMap, HeaderValue};
+
+    #[test]
+    fn test_extract_filename_from_url_simple() {
+        let url = "http://example.com/file.txt";
+        assert_eq!(extract_filename_from_url(url), Some("file.txt".to_string()));
+    }
+
+    #[test]
+    fn test_extract_filename_from_url_with_path() {
+        let url = "http://example.com/path/to/file.zip";
+        assert_eq!(extract_filename_from_url(url), Some("file.zip".to_string()));
+    }
+
+    #[test]
+    fn test_extract_filename_from_url_no_filename() {
+        let url = "http://example.com/path/";
+        assert_eq!(extract_filename_from_url(url), None);
+    }
+
+    #[test]
+    fn test_extract_filename_from_url_with_query() {
+        let url = "http://example.com/file.txt?key=value";
+        assert_eq!(extract_filename_from_url(url), Some("file.txt".to_string()));
+    }
+
+    #[test]
+    fn test_extract_filename_from_url_encoded_chars() {
+        let url = "http://example.com/file%20with%20spaces.txt";
+        assert_eq!(extract_filename_from_url(url), Some("file with spaces.txt".to_string()));
+    }
+
+    #[test]
+    fn test_extract_filename_from_url_encoded_chars_complex() {
+        let url = "http://example.com/file%21%40%23%24.txt";
+        assert_eq!(extract_filename_from_url(url), Some("file!@#$.txt".to_string()));
+    }
+
+    #[test]
+    fn test_extract_filename_from_headers_filename_only() {
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_DISPOSITION, HeaderValue::from_static("attachment; filename=test.txt"));
+        assert_eq!(extract_filename_from_headers(&headers), Some("test.txt".to_string()));
+    }
+
+    #[test]
+    fn test_extract_filename_from_headers_quoted_filename() {
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_DISPOSITION, HeaderValue::from_static("attachment; filename=\"quoted file.txt\""));
+        assert_eq!(extract_filename_from_headers(&headers), Some("quoted file.txt".to_string()));
+    }
+
+    #[test]
+    fn test_extract_filename_from_headers_encoded_filename() {
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_DISPOSITION, HeaderValue::from_static("attachment; filename*=UTF-8''encoded%20file.txt"));
+        assert_eq!(extract_filename_from_headers(&headers), Some("encoded file.txt".to_string()));
+    }
+
+    #[test]
+    fn test_extract_filename_from_headers_encoded_filename_with_special_chars() {
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_DISPOSITION, HeaderValue::from_static("attachment; filename*=UTF-8''f%C3%A9ile%20name%21.txt"));
+        assert_eq!(extract_filename_from_headers(&headers), Some("féile name!.txt".to_string()));
+    }
+
+    #[test]
+    fn test_extract_filename_from_headers_no_filename() {
+        let headers = HeaderMap::new();
+        assert_eq!(extract_filename_from_headers(&headers), None);
+    }
+
+    #[test]
+    fn test_extract_filename_from_headers_empty_filename() {
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_DISPOSITION, HeaderValue::from_static("attachment; filename="));
+        assert_eq!(extract_filename_from_headers(&headers), None);
+    }
+
+    #[test]
+    fn test_extract_filename_precedence_headers_over_url() {
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_DISPOSITION, HeaderValue::from_static("attachment; filename=header_file.txt"));
+        let url = "http://example.com/url_file.txt";
+        assert_eq!(extract_filename(&headers, url), Some("header_file.txt".to_string()));
+    }
+
+    #[test]
+    fn test_extract_filename_sanitization_invalid_chars() {
+        let filename = "file/name:with?invalid\"chars*.txt";
+        assert_eq!(sanitize_filename(filename), "file_name_with_invalid_chars_.txt".to_string());
+    }
+
+    #[test]
+    fn test_extract_filename_sanitization_leading_dots() {
+        let filename = "...file.txt";
+        assert_eq!(sanitize_filename(filename), "file.txt".to_string());
+    }
+
+    #[test]
+    fn test_extract_filename_sanitization_empty_after_sanitize() {
+        let filename = "///";
+        assert_eq!(sanitize_filename(filename), "unnamed_file".to_string());
     }
 }

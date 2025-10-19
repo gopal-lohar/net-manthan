@@ -15,3 +15,4 @@ uuid.workspace = true
 futures-util.workspace = true
 url = "2.5.7"
 mime = "0.3.17"
+percent-encoding = "2.3.2"

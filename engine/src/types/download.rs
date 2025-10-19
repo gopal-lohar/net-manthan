@@ -356,7 +356,7 @@ async fn resolve_file_name_conflict(dir: &str, original_name: &str) -> Option<St
     // Find available numbered filename
     let mut counter = 1;
     loop {
-        let new_name = format!("{file_stem}_({counter}){extension}");
+        let new_name = format!("{file_stem} ({counter}){extension}");
         let mut new_path = PathBuf::from(&dir);
         new_path.push(&new_name);
 
