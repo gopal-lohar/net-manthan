@@ -63,7 +63,7 @@ impl Default for AddDownload {
                 "User Agent",
                 "Enter the user agent you want to use",
             )
-            .with_value("net-manthan/0.1.0"),
+            .with_value("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"),
             authorization_input: ValidatedInput::new("Authorization", "Enter authorization"),
             referer_input: ValidatedInput::new("Referer", "Enter Referer site"),
             cookie_input: ValidatedInput::new("Cookie", "Enter cookie here"),
@@ -211,8 +211,9 @@ impl AddDownload {
                     self.update_interval_input.validate();
                 }
 
-                let mut all_valid =
-                    self.link_input.is_valid() && self.directory_input.is_valid() && self.file_name_input.is_valid();
+                let mut all_valid = self.link_input.is_valid()
+                    && self.directory_input.is_valid()
+                    && self.file_name_input.is_valid();
 
                 if self.show_advanced_options {
                     all_valid = all_valid
@@ -418,15 +419,22 @@ impl AddDownload {
             Direction::Vertical(Scrollbar::default()),
         );
 
-        let modal = container(column![modal_header, modal_content])
-            .style(|theme: &Theme| iced::widget::container::Style {
-                background: Some(Background::Color(theme.palette().background)),
-                border: Border::default()
-                    .width(1)
-                    .color(theme.palette().primary.scale_alpha(0.1)),
-                ..Default::default()
-            })
-            .width(FONT_SIZE_BODY * 32.);
+        let modal =
+            container(column![modal_header, modal_content])
+                .style(|theme: &Theme| iced::widget::container::Style {
+                    background: Some(Background::Color(theme.palette().background)),
+                    border: Border::default()
+                        .width(1)
+                        .color(theme.palette().text.scale_alpha(
+                            if theme.extended_palette().is_dark {
+                                0.02
+                            } else {
+                                0.2
+                            },
+                        )),
+                    ..Default::default()
+                })
+                .width(FONT_SIZE_BODY * 32.);
 
         let modal_container = container(mouse_area(modal).on_press(AddDownloadMessage::DoNothing))
             .center(0)

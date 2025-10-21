@@ -9,7 +9,7 @@ use crate::{
         icons::{Icon, themed_icon},
         toast::{Toast, ToastMessage, ToastVariant},
     },
-    styles::constants::FONT_SIZE_BODY,
+    styles::constants::{BORDER_WIDTH, FONT_SIZE_BODY},
     types::{
         config::{Config, UpdateUiConfig},
         message::{Message, Page},
@@ -17,8 +17,12 @@ use crate::{
     },
 };
 use iced::{
-    Alignment, Element, Length, Padding, Subscription, Task, Theme,
-    widget::{PickList, Space, button, column, container, row, slider, stack, text, toggler},
+    Alignment, Background, Element, Length, Padding, Pixels, Subscription, Task, Theme,
+    widget::{
+        PickList, Space,
+        button::{self, Button, Status, Style},
+        column, container, row, slider, stack, text, toggler,
+    },
     window,
 };
 use std::{sync::Arc, time::Duration};
@@ -26,12 +30,13 @@ use tracing::trace;
 use utils::rpc::{client::Client, messages::RpcRequest};
 
 pub struct DownloadManager {
-    config: Config,
-    title_bar: TitleBar,
-    current_page: Page,
-    downloads: Downloads,
-    dialog: Dialog,
     client: Arc<Client>,
+    config: Config,
+    current_page: Page,
+    default_page: Page,
+    dialog: Dialog,
+    downloads: Downloads,
+    title_bar: TitleBar,
     toast: Toast,
 }
 
@@ -41,7 +46,8 @@ impl DownloadManager {
             config: Config::default(),
             client,
             title_bar: TitleBar::default(),
-            current_page: Page::Downloading,
+            current_page: Page::AllDownloads,
+            default_page: Page::AllDownloads,
             downloads: Downloads::default(),
             toast: Toast::default(),
             dialog: Dialog::None,
@@ -235,9 +241,9 @@ impl DownloadManager {
 
         column![
             row![
-                button(themed_icon(Icon::ArrowBack, FONT_SIZE_BODY * 1.25, None))
+                Button::new(themed_icon(Icon::ArrowBack, FONT_SIZE_BODY * 1.25, None))
                     .style(button::text)
-                    .on_press(Message::Navigate(Page::Downloading)),
+                    .on_press(Message::Navigate(self.default_page.clone())),
                 text("Settings"),
             ]
             .padding(FONT_SIZE_BODY * 0.5)
@@ -270,13 +276,23 @@ impl DownloadManager {
     }
 
     fn side_bar_view(&self, collapsed: bool) -> Element<'_, Message> {
-        let sidebar_button = |icon: Icon, button_text: String, page: Page| {
-            let content = row![themed_icon(icon, FONT_SIZE_BODY * 1.25, None)];
-            let button = button(
+        let sidebar_button = |page: &Page, current_page: &Page| {
+            let current_page = page == current_page;
+            let content = row![themed_icon(
+                match page {
+                    Page::AllDownloads => Icon::Directory,
+                    Page::Downloading => Icon::Downloading,
+                    Page::Paused => Icon::Pause,
+                    Page::Settings => Icon::Settings,
+                },
+                FONT_SIZE_BODY * 1.25,
+                None
+            )];
+            let button = Button::new(
                 if collapsed {
                     content
                 } else {
-                    content.push(text(button_text))
+                    content.push(text(page.as_str().to_owned()))
                 }
                 .spacing(FONT_SIZE_BODY * 0.5)
                 .align_y(Alignment::Center),
@@ -290,8 +306,38 @@ impl DownloadManager {
                     })
                     .right(FONT_SIZE_BODY * 1.25),
             )
-            .on_press(Message::Navigate(page))
-            .style(button::text);
+            .on_press(Message::Navigate(page.to_owned()))
+            .style(move |theme: &Theme, status: Status| -> Style {
+                let palette = theme.extended_palette();
+
+                let base = Style {
+                    text_color: palette.background.base.text,
+                    background: if current_page {
+                        Some(Background::Color(
+                            theme.palette().text.scale_alpha(if palette.is_dark {
+                                0.02
+                            } else {
+                                0.2
+                            }),
+                        ))
+                    } else {
+                        None
+                    },
+                    ..Style::default()
+                };
+
+                match status {
+                    Status::Active | Status::Pressed => base,
+                    Status::Hovered => Style {
+                        text_color: palette.background.base.text.scale_alpha(0.9),
+                        ..base
+                    },
+                    Status::Disabled => Style {
+                        text_color: palette.background.base.text.scale_alpha(0.6),
+                        ..base
+                    },
+                }
+            });
             if collapsed {
                 button
             } else {
@@ -299,28 +345,39 @@ impl DownloadManager {
             }
         };
 
-        return container(
+        let separator = container("")
+            .height(Length::Fill)
+            .width(Pixels::from(BORDER_WIDTH))
+            .style(|theme: &Theme| {
+                let palette = theme.extended_palette();
+                container::Style {
+                    background: Some(
+                        theme
+                            .palette()
+                            .text
+                            .scale_alpha(if palette.is_dark { 0.02 } else { 0.2 })
+                            .into(),
+                    ),
+                    ..Default::default()
+                }
+            });
+
+        return container(row![
             column![
-                sidebar_button(Icon::Downloading, "Downloading".into(), Page::Downloading),
-                sidebar_button(Icon::Pause, "Waiting".into(), Page::Waiting),
-                sidebar_button(Icon::Directory, "All Downloads".into(), Page::All),
+                sidebar_button(&Page::AllDownloads, &self.current_page),
+                sidebar_button(&Page::Downloading, &self.current_page),
+                sidebar_button(&Page::Paused, &self.current_page),
                 Space::new(0., Length::Fill),
-                sidebar_button(Icon::Settings, "Settings".into(), Page::Settings),
+                sidebar_button(&Page::Settings, &self.current_page),
             ]
             .padding(
                 Padding::new(0.)
                     .top(FONT_SIZE_BODY * 1.25)
                     .bottom(FONT_SIZE_BODY * 1.25),
             ),
-        )
+            separator
+        ])
         .height(Length::Fill)
-        .style(|theme: &Theme| {
-            let palette = theme.extended_palette();
-            container::Style {
-                background: Some(palette.background.weak.color.scale_alpha(0.05).into()),
-                ..Default::default()
-            }
-        })
         .into();
     }
 
@@ -329,10 +386,11 @@ impl DownloadManager {
         let content = row![
             self.side_bar_view(self.config.ui.size.width < 1100.),
             match self.current_page {
-                Page::All | Page::Downloading =>
-                    self.downloads.view().map(Message::DownloadsMessage),
+                Page::Downloading | Page::Paused | Page::AllDownloads => self
+                    .downloads
+                    .view(&self.current_page)
+                    .map(Message::DownloadsMessage),
                 Page::Settings => self.settings_view(),
-                _ => text("404").into(),
             }
         ];
         let dialog = self.dialog.view().map(Message::DialogMessage);

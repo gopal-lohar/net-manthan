@@ -5,9 +5,7 @@ use crate::{
 };
 use iced::{
     Alignment, Border, Element, Length, Padding, Pixels, Task, Theme,
-    widget::{
-        Space, button, column, container, mouse_area, row, shader::wgpu::naga::BOOL_WIDTH, text,
-    },
+    widget::{Space, button, column, container, mouse_area, row, text},
     window,
 };
 
@@ -124,13 +122,20 @@ impl TitleBar {
 
             let separator = container("")
                 .width(Length::Fill)
-                .height(Pixels::from(BOOL_WIDTH as u16))
-                .style(|theme: &Theme| {
-                    let palette = theme.extended_palette();
-                    container::Style {
-                        background: Some(palette.background.weak.color.scale_alpha(0.05).into()),
-                        ..Default::default()
-                    }
+                .height(Pixels::from(BORDER_WIDTH))
+                .style(|theme: &Theme| container::Style {
+                    background: Some(
+                        theme
+                            .palette()
+                            .text
+                            .scale_alpha(if theme.extended_palette().is_dark {
+                                0.02
+                            } else {
+                                0.2
+                            })
+                            .into(),
+                    ),
+                    ..Default::default()
                 });
 
             column![title_bar, separator].into()

@@ -1,5 +1,5 @@
 use crate::{
-    NET_MANTHAN_LOWERCASE,
+    APP_NAME_LOWERCASE,
     helpers::{extract_filename::extract_filename, random::generate_random_id},
 };
 use mime::Mime;
@@ -142,10 +142,6 @@ impl DownloadRequest {
     }
 
     pub fn get_random_file_name() -> String {
-        format!(
-            "{}_download_{}",
-            NET_MANTHAN_LOWERCASE,
-            generate_random_id()
-        )
+        format!("{}_download_{}", APP_NAME_LOWERCASE, generate_random_id())
     }
 }

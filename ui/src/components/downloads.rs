@@ -1,5 +1,8 @@
 use super::icons::{Icon, themed_icon};
-use crate::styles::constants::{BORDER_ROUNDED_RADIUS, BORDER_WIDTH, FONT_SIZE_BODY};
+use crate::{
+    styles::constants::{BORDER_ROUNDED_RADIUS, BORDER_WIDTH, FONT_SIZE_BODY},
+    types::message::Page,
+};
 use engine::{
     helpers::format::{format_bytes, format_duration, format_speed},
     types::{download::Download, status::DownloadStatus},
@@ -55,20 +58,30 @@ impl Downloads {
         }
     }
 
-    pub fn view(&self) -> Element<'_, DownloadsMessage> {
+    pub fn view(&self, current_page: &Page) -> Element<'_, DownloadsMessage> {
         let mut downloads_column = Vec::new();
 
         let downloads_column: Element<DownloadsMessage> = match &self.all {
             Ok(downloads) => {
-                if downloads.is_empty() {
+                let filtered_downloads = downloads.iter().filter(|d| match current_page {
+                    Page::Downloading => d.get_status() == DownloadStatus::Downloading,
+                    Page::Paused => d.get_status() == DownloadStatus::Paused,
+                    Page::AllDownloads => true,
+                    Page::Settings => false,
+                });
+                if filtered_downloads.clone().next().is_none() {
                     Column::new()
-                        .push(text("No downloads").center().width(Length::Fill))
+                        .push(
+                            text(format!("Nothing in {}", current_page.as_str()))
+                                .center()
+                                .width(Length::Fill),
+                        )
                         .width(Length::Fill)
                         .padding(FONT_SIZE_BODY)
                         .into()
                 } else {
-                    for download in downloads {
-                        downloads_column.push(download_view(&download));
+                    for download in filtered_downloads {
+                        downloads_column.push(download_view(download));
                     }
                     Column::from_vec(downloads_column)
                         .width(Length::Fill)
@@ -100,7 +113,7 @@ impl Downloads {
         .into();
         column![
             row![
-                container("Home").width(Length::Fill),
+                container(text(current_page.as_str().to_owned())).width(Length::Fill),
                 button(
                     row![
                         themed_icon(Icon::Add, FONT_SIZE_BODY * 1.25, None),

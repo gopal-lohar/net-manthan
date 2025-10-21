@@ -22,11 +22,21 @@ pub enum Message {
     UpdateUiConfig(UpdateUiConfig),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Page {
     Downloading,
-    Waiting,
-    All,
-    Actions,
+    Paused,
+    AllDownloads,
     Settings,
+}
+
+impl Page {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Page::Downloading => "Downloading",
+            Page::Paused => "Paused",
+            Page::AllDownloads => "All Downloads",
+            Page::Settings => "Settings",
+        }
+    }
 }
