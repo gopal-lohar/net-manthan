@@ -6,6 +6,8 @@ use engine::types::{
     messages::DownloadRequestMessage,
     request::{DownloadRequest, Headers},
 };
+use sqlx::SqlitePool;
+use std::fs;
 use tokio::sync::mpsc;
 use tracing::Level;
 use utils::{
@@ -155,6 +157,25 @@ async fn main() {
         }
     };
 
+    fs::create_dir_all("data").expect("Failed to create data directory");
+    let db_path = "data/downloads.db";
+    let pool = SqlitePool::connect(&format!("sqlite:{db_path}?mode=rwc"))
+        .await
+        .expect("Failed to connect to the database");
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS downloads (
+            id INTEGER PRIMARY KEY NOT NULL,
+            request TEXT NOT NULL,
+            time_stamps TEXT NOT NULL,
+            config TEXT NOT NULL,
+            chunks_info TEXT NOT NULL
+        )",
+    )
+    .execute(&pool)
+    .await
+    .expect("Failed to create downloads table");
+
     let shutdown_tx = ctrl_c::ctrl_c();
     let (sender, receiver) = mpsc::channel::<ManagerCommand>(10);
     let mut download_manager = DownloadManager::new(
@@ -162,6 +183,7 @@ async fn main() {
         sender.clone(),
         cli.daemon,
         cli.pretty_print.unwrap_or(!cli.daemon),
+        pool,
     )
     .await;
     if cli.daemon {

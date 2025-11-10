@@ -2,10 +2,15 @@ use chrono::{DateTime, Utc};
 use engine::{
     download::start_download::start_download,
     types::{
-        chunks::ChunksInfo, download::Download, download_handle::DownloadHandle,
-        request::DownloadRequest, status::DownloadStatus,
+        chunks::ChunksInfo,
+        download::Download,
+        download_handle::DownloadHandle,
+        others::DownloadConfig,
+        request::DownloadRequest,
+        status::DownloadStatus,
     },
 };
+use sqlx::{Row, SqlitePool};
 use std::{
     collections::{HashMap, VecDeque},
     time::Duration,
@@ -21,11 +26,12 @@ use tracing::{debug, info, trace};
 use utils::{
     pretty_print_downloads::pretty_print_downloads,
     rpc::{
-        NativeRpcSettings, RpcConfig,
         messages::{RpcRequest, RpcResponse},
         server::{ManagerCommand, RpcServer, RpcServerHandle},
+        NativeRpcSettings, RpcConfig,
     },
 };
+use serde_json;
 
 pub struct DownloadManager {
     all: Vec<Download>,
@@ -47,6 +53,7 @@ pub struct DownloadManager {
     shutting_down: bool,
     daemon_mode: bool,
     pretty_print: bool,
+    pool: SqlitePool,
 }
 
 impl DownloadManager {
@@ -55,13 +62,52 @@ impl DownloadManager {
         command_sender: mpsc::Sender<ManagerCommand>,
         daemon_mode: bool,
         pretty_print: bool,
+        pool: SqlitePool,
     ) -> Self {
+        let mut all: Vec<Download> = Vec::new();
+        let mut queue: VecDeque<i64> = VecDeque::new();
+        let mut dirty: Vec<i64> = Vec::new();
+
+        let rows = sqlx::query("SELECT * FROM downloads")
+            .fetch_all(&pool)
+            .await
+            .expect("Failed to fetch downloads from the database");
+
+        for row in rows {
+            let request: DownloadRequest =
+                serde_json::from_str(row.get("request")).expect("Failed to deserialize request");
+            let time_stamps =
+                serde_json::from_str(row.get("time_stamps")).expect("Failed to deserialize time_stamps");
+            let config: DownloadConfig =
+                serde_json::from_str(row.get("config")).expect("Failed to deserialize config");
+            let chunks_info: ChunksInfo =
+                serde_json::from_str(row.get("chunks_info")).expect("Failed to deserialize chunks_info");
+
+            let download = Download {
+                id: row.get("id"),
+                request,
+                time_stamps,
+                config,
+                chunks_info,
+            };
+
+            if matches!(download.get_status(), DownloadStatus::Queued) {
+                queue.push_back(download.id);
+            }
+
+            all.push(download);
+        }
+
+        for download in &all {
+            dirty.push(download.id);
+        }
+
         Self {
-            all: Vec::new(),
+            all,
             active: Vec::new(),
             waiting_info: Vec::new(),
-            queue: VecDeque::new(),
-            dirty: Vec::new(),
+            queue,
+            dirty,
             rpc_server: None,
             load_info_tx: None,
             command_sender,
@@ -70,6 +116,7 @@ impl DownloadManager {
             shutting_down: false,
             daemon_mode,
             pretty_print,
+            pool,
         }
     }
 
@@ -166,7 +213,35 @@ impl DownloadManager {
             ManagerCommand::fire_forget(RpcRequest::Shutdown, &self.command_sender).await;
         }
 
-        // TODO: write dirty downloads
+        for id in &self.dirty {
+            if let Some(download) = self.all.iter().find(|d| d.id == *id) {
+                let request = serde_json::to_string(&download.request)
+                    .expect("Failed to serialize request");
+                let time_stamps = serde_json::to_string(&download.time_stamps)
+                    .expect("Failed to serialize time_stamps");
+                let config =
+                    serde_json::to_string(&download.config).expect("Failed to serialize config");
+                let chunks_info = serde_json::to_string(&download.chunks_info)
+                    .expect("Failed to serialize chunks_info");
+
+                let pool = self.pool.clone();
+                let id = *id;
+                tokio::spawn(async move {
+                    sqlx::query(
+                        "INSERT OR REPLACE INTO downloads (id, request, time_stamps, config, chunks_info) VALUES (?, ?, ?, ?, ?)",
+                    )
+                    .bind(id)
+                    .bind(request)
+                    .bind(time_stamps)
+                    .bind(config)
+                    .bind(chunks_info)
+                    .execute(&pool)
+                    .await
+                    .expect("Failed to insert or replace download in the database");
+                });
+            }
+        }
+        self.dirty.clear();
     }
 
     pub async fn run(
