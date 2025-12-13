@@ -1,21 +1,15 @@
+use crate::types::config::Config;
 use std::{process::Command, sync::Arc};
 use tracing::{info, warn};
-use utils::rpc::{NativeRpcSettings, RpcConfig, client::Client};
+use utils::rpc::client::Client;
 
 pub struct DaemonManager {
-    config: RpcConfig,
+    config: Config,
 }
 
 impl DaemonManager {
-    pub fn new() -> Self {
-        Self {
-            config: RpcConfig {
-                native_rpc_settings: NativeRpcSettings {
-                    address: "/tmp/vayu.sock".into(),
-                    allow_all_users: true,
-                },
-            },
-        }
+    pub fn new(config: Config) -> Self {
+        Self { config }
     }
 
     pub async fn get_client_handle(&self) -> Arc<Client> {
@@ -29,15 +23,7 @@ impl DaemonManager {
     }
 
     async fn connect_to_daemon(&self) -> Arc<Client> {
-        let client = Client::new(
-            "".into(),
-            RpcConfig {
-                native_rpc_settings: NativeRpcSettings {
-                    address: "/tmp/vayu.sock".into(),
-                    allow_all_users: true,
-                },
-            },
-        );
+        let client = Client::new("".into(), self.config.rpc.clone());
         let _ = client.connect().await;
         Arc::new(client)
     }
@@ -83,21 +69,23 @@ impl DaemonManager {
 
         #[cfg(unix)]
         {
-            let _ = std::fs::remove_file(&self.config.native_rpc_settings.address);
+            let _ = std::fs::remove_file(&self.config.rpc.native_rpc_settings.address);
         }
         #[cfg(debug_assertions)]
         let mut cmd = Command::new("./target/debug/vayuget");
         #[cfg(not(debug_assertions))]
         let mut cmd = Command::new("vayuget");
 
-        cmd.args(&["--daemon", "--log-level=trace"]);
-
-        // #[cfg(unix)]
-        // {
-        //     cmd.stdout(Stdio::null())
-        //         .stderr(Stdio::null())
-        //         .stdin(Stdio::null());
-        // }
+        cmd.args(&[
+            "--db-path",
+            self.config.vayuget.db_path.to_str().unwrap(),
+            "--downloads-path",
+            self.config.vayuget.downloads_path.to_str().unwrap(),
+            "--log-path",
+            self.config.vayuget.log_path.to_str().unwrap(),
+            "--address",
+            &self.config.rpc.native_rpc_settings.address,
+        ]);
 
         #[cfg(target_os = "windows")]
         {

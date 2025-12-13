@@ -28,7 +28,7 @@ use utils::{
     rpc::{
         messages::{RpcRequest, RpcResponse},
         server::{ManagerCommand, RpcServer, RpcServerHandle},
-        NativeRpcSettings, RpcConfig,
+        RpcConfig,
     },
 };
 use serde_json;
@@ -46,6 +46,7 @@ pub struct DownloadManager {
     /// Can be converted into a Hashmap
     dirty: Vec<i64>,
     rpc_server: Option<RpcServer>,
+    rpc_config: RpcConfig,
     load_info_tx: Option<Sender<(i64, DownloadRequest)>>,
     command_sender: Sender<ManagerCommand>,
     last_updated: DateTime<Utc>,
@@ -63,6 +64,7 @@ impl DownloadManager {
         daemon_mode: bool,
         pretty_print: bool,
         pool: SqlitePool,
+        rpc_config: RpcConfig,
     ) -> Self {
         let mut all: Vec<Download> = Vec::new();
         let mut queue: VecDeque<i64> = VecDeque::new();
@@ -109,6 +111,7 @@ impl DownloadManager {
             queue,
             dirty,
             rpc_server: None,
+            rpc_config,
             load_info_tx: None,
             command_sender,
             last_updated: Utc::now(),
@@ -121,20 +124,16 @@ impl DownloadManager {
     }
 
     /// Starts the RPC server in the same thread.
-    pub async fn start_server(&mut self, secret: String, sender: mpsc::Sender<ManagerCommand>) {
+    pub async fn start_server(
+        &mut self,
+        secret: Option<String>,
+        sender: mpsc::Sender<ManagerCommand>,
+    ) {
         let rpc_server_handle = RpcServerHandle {
             command_sender: sender,
-            secret,
+            secret: secret.unwrap_or_default(),
         };
-        let mut rpc_server = RpcServer::new(
-            &RpcConfig {
-                native_rpc_settings: NativeRpcSettings {
-                    address: "/tmp/vayu.sock".into(),
-                    allow_all_users: true,
-                },
-            },
-            rpc_server_handle,
-        );
+        let mut rpc_server = RpcServer::new(&self.rpc_config, rpc_server_handle);
         rpc_server.start().await;
         self.rpc_server = Some(rpc_server);
     }

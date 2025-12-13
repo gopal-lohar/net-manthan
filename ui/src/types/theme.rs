@@ -1,6 +1,7 @@
 use iced::Theme;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ThemeOptions {
     Light,
     Dark,
@@ -20,6 +21,7 @@ pub enum ThemeOptions {
     KanagawaWave,
     KanagawaDragon,
     KanagawaLotus,
+    #[default]
     Moonfly,
     Nightfly,
     Oxocarbon,

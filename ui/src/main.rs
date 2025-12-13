@@ -3,7 +3,7 @@ use download_manager::DownloadManager;
 use iced::{Pixels, Task, application, window};
 use styles::constants::FONT_SIZE_BODY;
 use tracing::Level;
-use types::config::Config;
+use types::config::{Config, UiConfig};
 use utils::logger::{Component, LogConfig, get_ui_silent_deps, init_logger};
 
 pub mod components;
@@ -17,7 +17,20 @@ pub const WINDOW_ID: &str = "Vayuget";
 
 #[tokio::main]
 async fn main() -> iced::Result {
-    let config = Config::default();
+    let config_path = UiConfig::get_config_path();
+    let config: Config = if config_path.exists() {
+        let config_str = std::fs::read_to_string(&config_path).unwrap();
+        toml::from_str(&config_str).unwrap()
+    } else {
+        let config = Config::default();
+        let config_str = toml::to_string_pretty(&config).unwrap();
+        if let Some(parent) = config_path.parent() {
+            std::fs::create_dir_all(parent).unwrap();
+        }
+        std::fs::write(&config_path, config_str).unwrap();
+        config
+    };
+
     match init_logger(LogConfig {
         component: Component::Ui,
         log_dir: None,
@@ -33,7 +46,7 @@ async fn main() -> iced::Result {
         }
     };
 
-    let daemon_manager = DaemonManager::new();
+    let daemon_manager = DaemonManager::new(config.clone());
     let client = daemon_manager.get_client_handle().await;
 
     application(
@@ -56,7 +69,7 @@ async fn main() -> iced::Result {
     .subscription(DownloadManager::subscription)
     .run_with(move || {
         (
-            DownloadManager::new(client),
+            DownloadManager::new(client, config),
             Task::done(types::message::Message::Refetch),
         )
     })

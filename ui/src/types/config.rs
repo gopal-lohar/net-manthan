@@ -1,38 +1,83 @@
 use super::theme::ThemeOptions;
 use iced::{Size, Task, window};
-use utils::rpc::{NativeRpcSettings, RpcConfig};
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use utils::config;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Config {
     pub ui: UiConfig,
-    pub rpc: RpcConfig,
-}
-
-#[derive(Clone)]
-pub struct UiConfig {
-    pub custom_decoration: bool,
-    pub theme: ThemeOptions,
-    pub scale_factor: f64,
-    pub size: Size,
-    pub maximized: bool,
+    pub vayuget: config::Vayuget, // comes from the utils crate
+    pub rpc: config::RpcConfig,   // comes from the utils crate
 }
 
 impl Default for Config {
     fn default() -> Self {
+        let config = config::Config::default();
         Self {
-            ui: UiConfig {
-                custom_decoration: true,
-                theme: ThemeOptions::Moonfly,
-                scale_factor: 1.,
-                size: Size::new(1024.0, 768.0),
-                maximized: false,
-            },
-            rpc: RpcConfig {
-                native_rpc_settings: NativeRpcSettings {
-                    address: "/tmp/vayu.sock".into(),
-                    allow_all_users: true,
-                },
-            },
+            ui: UiConfig::default(),
+            vayuget: config.vayuget,
+            rpc: config.rpc,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct UiConfig {
+    pub custom_decoration: bool,
+    pub theme: ThemeOptions,
+    pub scale_factor: f64,
+    pub size: SerializableSize,
+    pub maximized: bool,
+    pub vayuget_path: PathBuf,
+    pub config_path: PathBuf,
+}
+
+impl Default for UiConfig {
+    fn default() -> Self {
+        Self {
+            custom_decoration: true,
+            theme: ThemeOptions::Moonfly,
+            scale_factor: 1.,
+            size: SerializableSize::new(1024.0, 768.0),
+            maximized: false,
+            vayuget_path: PathBuf::from("/usr/bin/vayuget"), // updated from the daemon manager
+            config_path: Self::get_config_path(),
+        }
+    }
+}
+
+impl UiConfig {
+    pub fn get_config_path() -> PathBuf {
+        dirs::config_dir()
+            .map(|p| p.join("net-manthan").join("ui.toml"))
+            .unwrap()
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct SerializableSize {
+    pub width: f32,
+    pub height: f32,
+}
+
+impl SerializableSize {
+    pub fn new(width: f32, height: f32) -> Self {
+        Self { width, height }
+    }
+}
+
+impl From<SerializableSize> for Size {
+    fn from(size: SerializableSize) -> Self {
+        Size::new(size.width, size.height)
+    }
+}
+
+impl From<Size> for SerializableSize {
+    fn from(size: Size) -> Self {
+        Self {
+            width: size.width,
+            height: size.height,
         }
     }
 }
@@ -66,7 +111,7 @@ impl UiConfig {
                 Task::none()
             }
             UpdateUiConfig::Size(size) => {
-                self.size = size;
+                self.size = size.into();
                 window::get_latest()
                     .and_then(window::get_maximized)
                     .map(UpdateUiConfig::Maximized)

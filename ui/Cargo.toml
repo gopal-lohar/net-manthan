@@ -12,3 +12,6 @@ rand.workspace = true
 iced = { version = "0.13", features = ["tokio", "svg", "image"] }
 rfd = "0.15"
 iced_futures = "0.13"
+serde = { version = "1.0", features = ["derive"] }
+dirs = "5.0.1"
+toml = "0.8.1"

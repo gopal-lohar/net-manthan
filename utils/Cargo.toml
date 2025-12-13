@@ -16,3 +16,5 @@ tracing-appender = "0.2.3"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 bincode = { version = "2.0.1", features = ["serde"] }
 colored = "3.0.0"
+dirs = "5.0.1"
+clap = { version = "4.5.49", features = ["derive"] }

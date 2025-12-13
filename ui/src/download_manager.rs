@@ -41,9 +41,9 @@ pub struct DownloadManager {
 }
 
 impl DownloadManager {
-    pub fn new(client: Arc<Client>) -> Self {
+    pub fn new(client: Arc<Client>, config: Config) -> Self {
         Self {
-            config: Config::default(),
+            config,
             client,
             title_bar: TitleBar::default(),
             current_page: Page::AllDownloads,
@@ -64,7 +64,14 @@ impl DownloadManager {
             }
             Message::DoNothing => Task::none(),
             Message::UpdateUiConfig(message) => {
-                self.config.ui.update(message).map(Message::UpdateUiConfig)
+                let task = self.config.ui.update(message).map(Message::UpdateUiConfig);
+                let config = self.config.clone();
+                let config_path = self.config.ui.config_path.clone();
+                tokio::spawn(async move {
+                    let config_str = toml::to_string_pretty(&config).unwrap();
+                    std::fs::write(config_path, config_str).unwrap();
+                });
+                task
             }
             Message::Toast(message) => self.toast.update(message).map(Message::Toast),
             Message::Periodic(_) => Task::done(Message::Refetch),
@@ -384,7 +391,7 @@ impl DownloadManager {
     pub fn view(&self) -> Element<'_, Message> {
         let title_bar = self.title_bar.view(&self.config.ui).map(Message::TitleBar);
         let content = row![
-            self.side_bar_view(self.config.ui.size.width < 1100.),
+            self.side_bar_view(Into::<iced::Size>::into(self.config.ui.size).width < 1100.),
             match self.current_page {
                 Page::Downloading | Page::Paused | Page::AllDownloads => self
                     .downloads
